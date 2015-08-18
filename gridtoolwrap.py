@@ -11,7 +11,7 @@ job_id = ''
 service_path = ('http://miles.giscenter.isu.edu/arcgis/rest/services/WCWAVE_DEV/'
                 'runGriddingTools/GPServer/Climate%20Data%20Gridding%20Tools/')
 
-def Download(url):
+def download(url):
     """
     Download File and save to current directory
 
@@ -35,7 +35,7 @@ def Download(url):
     else:
         print("Bad URL")
 
-def SubmitJob(from_date, to_date, time_step=1, kriging_method='Detrended',
+def submit_job(from_date, to_date, time_step=1, kriging_method='Detrended',
               run_all_tools='false', air_temperature='false', constants='false',
               dew_point_temperature='false', precipitation_mass='false',
               snow_depth='false', snow_properties='false', soil_temperature='false',
@@ -109,7 +109,7 @@ def SubmitJob(from_date, to_date, time_step=1, kriging_method='Detrended',
     job_id = r.json()['jobId']
     return job_id
 
-def WatchStatus(id, sl=5):
+def watch_status(id, sl=5):
     """
     Watch status of Geoprocessing Job
 
@@ -121,13 +121,14 @@ def WatchStatus(id, sl=5):
     url = (service_path +'/'
            'jobs/'+id+'?f=json')
     r = requests.get(url)
-    while r.json()['jobStatus'] != u'esriJobSucceeded' and r.json()['jobStatus'] != u'esriJobFailed':
+    while (r.json()['jobStatus'] != u'esriJobSucceeded' 
+            and r.json()['jobStatus'] != u'esriJobFailed'):
         r = requests.get(url)
         print(r.json()['jobStatus'])
         time.sleep(sl)
     print(r.json()['jobStatus'])
 
-def CheckStatus(id):
+def check_status(id):
     """
     Check status of Geoprocessing Job
 
@@ -140,7 +141,7 @@ def CheckStatus(id):
     r = requests.get(url)
     print(r.json()['jobStatus'])
 
-def CancelJob(id):
+def cancel_job(id):
     """
     Cancel Geoprocessing Job
 
@@ -152,20 +153,20 @@ def CancelJob(id):
     r = requests.get(url)
     print(r.json())
 
-def PrintJson(id):
+def print_json(id):
     url = (service_path + '/'
            'jobs/'+id+'?f=json')
     r = requests.get(url)
     print(r.json())
 
-def GetOutput(id):
+def get_output(id):
     """
     Get JSON object of all downloadable output
 
     Args:
         id (str): Job ID of process
     Returns:
-        str: JSON object to pass to DownloadOutput
+        str: JSON object to pass to download_output
     """
     url = (service_path +'/'
            'jobs/'+id+'/results/Output?f=json')
@@ -173,7 +174,7 @@ def GetOutput(id):
     print(r.json())
     return r.json()
 
-def DownloadOutput(out_json):
+def download_output(out_json):
     """
     Download all output of geoprocessing job
 
@@ -182,11 +183,13 @@ def DownloadOutput(out_json):
     """
     print(out_json)
     for url in out_json['value']:
-        Download(url['url'])
+        download(url['url'])
 
 if __name__ == '__main__':
-    new_job = SubmitJob(from_date=u'1986-12-02 18:00:00', to_date=u'1986-12-02 19:00:00', air_temperature='true')
-    CheckStatus(new_job)
-    PrintJson(new_job)
+    new_job = submit_job(from_date=u'1986-12-02 18:00:00',
+                         to_date=u'1986-12-02 19:00:00',
+                         air_temperature='true')
+    watch_status(new_job)
+    print_json(new_job)
 
 #r = requests.get(url)
