@@ -36,11 +36,13 @@ def download(url):
         print("Bad URL")
 
 def submit_job(from_date, to_date, time_step=1, kriging_method='Detrended',
-              run_all_tools='false', air_temperature='false', constants='false',
-              dew_point_temperature='false', precipitation_mass='false',
-              snow_depth='false', snow_properties='false', soil_temperature='false',
-              solar_radiation='false', thermal_radiation='false', vapor_pressure='false',
-              wind_speed='false', out_spatial_reference="", process_spatial_reference="",
+              run_all_tools='false', air_temperature='false', 
+              constants='false', dew_point_temperature='false', 
+              precipitation_mass='false', snow_depth='false',
+              snow_properties='false', soil_temperature='false',
+              solar_radiation='false', thermal_radiation='false',
+              vapor_pressure='false', wind_speed='false',
+              out_spatial_reference="", process_spatial_reference="",
               return_z='false', return_m='false'):
     """
     Send job to geoprocessing server.
@@ -52,14 +54,19 @@ def submit_job(from_date, to_date, time_step=1, kriging_method='Detrended',
         kiriging_method (str): 'Detrended' or 'EBK' (default 'Detrended')
         run_all_tools (bool): Runs all tools (default 'false')
         air_temperature (bool): Creates air temperature grid (default 'false')
-        constants (bool): Creates 2 constant grids (Roughness Length and Water Saturation %) (default 'false')
-        dew_point_temperature (bool): Creates dew point temperature grid (default 'false')
-        precipitation_mass (bool): Creates precipitation mass grid (default 'false')
+        constants (bool): Creates 2 constant grids (Roughness Length and 
+                          Water Saturation %) (default 'false')
+        dew_point_temperature (bool): Creates dew point temperature grid 
+                                      (default 'false')
+        precipitation_mass (bool): Creates precipitation mass grid 
+                                   (default 'false')
         snow_depth (bool): Creates snow depth grid (default 'false')
         snow_properties (bool): Creates snow properties grid (default 'false')
         soil_temperature (bool): Creates soil temperature grid (default 'false')
         solar_radiation (bool): Creates solar radiation grid (default 'false')
-        thermal_radiation (bool): Creates thermal radiation grid. (Requires air temperature, vapor pressure and surface temperature) (default 'false')
+        thermal_radiation (bool): Creates thermal radiation grid. 
+                                  (Requires air temperature, vapor pressure,
+                                  and surface temperature) (default 'false')
         vapor_pressure (bool): Creates vapor pressure grid (default 'false')
         wind_speed (bool): Creates wind speed grid (default 'false')
         out_spatial_reference (str): 
