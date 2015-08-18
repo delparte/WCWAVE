@@ -165,8 +165,16 @@ def print_json(id):
            'jobs/'+id+'?f=json')
     r = requests.get(url)
     print(r.json())
+    return r.json()
 
-def get_output(id):
+def print_messages(id):
+    url = (service_path +'/'
+           'jobs/'+id+'?f=json')
+    r = requests.get(url)
+    for message in r.json()['messages']:
+        print(message['description'])
+
+def download_output(id):
     """
     Get JSON object of all downloadable output
 
@@ -179,18 +187,21 @@ def get_output(id):
            'jobs/'+id+'/results/Output?f=json')
     r = requests.get(url)
     print(r.json())
-    return r.json()
-
-def download_output(out_json):
-    """
-    Download all output of geoprocessing job
-
-    Args:
-    id (str): Job ID of process output to download.
-    """
-    print(out_json)
-    for url in out_json['value']:
+    out_json = r.json()
+    for url in out_json['values']:
         download(url['url'])
+
+#def download_output(out_json):
+#    """
+#    Combined with get output function
+#    Download all output of geoprocessing job
+#    
+#    Args:
+#    id (str): Job ID of process output to download.
+#    """
+#    print(out_json)
+#    for url in out_json['value']:
+#        download(url['url'])
 
 if __name__ == '__main__':
     new_job = submit_job(from_date=u'1986-12-02 18:00:00',
