@@ -59,7 +59,7 @@ density_interp_values = json.loads(arcpy.GetParameter(15).JSON)
 bool_soil_temperature = arcpy.GetParameter(16)
 bool_solar_radiation = arcpy.GetParameter(17)
 bool_thermal_radiation = arcpy.GetParameter(18)
-bool_VaporPressure = arcpy.GetParameter(19)
+bool_vapor_pressure = arcpy.GetParameter(19)
 bool_wind_speed = arcpy.GetParameter(20)
 #tempOutput = arcpy.GetParameterAsText(16)
 
@@ -77,12 +77,12 @@ scratch_gdb = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
 
 #Define Functions
-def roundTime(dt, roundTo=60):
+def round_time(dt, roundTo=60):
     seconds = (dt - dt.min).seconds
     rounding = (seconds+roundTo/2) // roundTo * roundTo
     return dt + datetime.timedelta(0,rounding-seconds,-dt.microsecond)
 
-def airTemperature():
+def air_temperature():
     #Caclulate average air temperatures over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratch_gdb + "/climate_table1", "airTemperature_Table", "air_temperature > -500")
     arcpy.Statistics_analysis("airTemperature_Table", "in_memory/airTemperature_Table2", "air_temperature MEAN", "site_key")
@@ -150,7 +150,7 @@ def constants():
 
     return out_folder + "/roughness_length_" + s_time_stamp + ".tif", out_folder + "/H2O_saturation_" + s_time_stamp + ".tif"
 
-def dewPoint():
+def dew_point():
     #Caclulate average dew point temperature values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratch_gdb + "/climate_table1", "dewPoint_Table", "dewpoint_temperature > -500")
     arcpy.Statistics_analysis("dewPoint_Table", "in_memory/dewPoint_Table2", "dewpoint_temperature MEAN", "site_key")
@@ -228,7 +228,7 @@ def dewPoint():
 
     return out_folder + "/dew_point_temperature_" + s_time_stamp + ".tif", out_folder + "/percent_snow_" + s_time_stamp + ".tif", out_folder + "/precipitation_snow_density_" + s_time_stamp + ".tif"
 
-def precipMass():
+def precip_mass():
     #Caclulate average precipitation values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratch_gdb + "/precipitation_table1", "precipitation_Table", "ppts > -500")
     arcpy.Statistics_analysis("precipitation_Table", "in_memory/precipitation_Table2", "ppts MEAN", "site_key")
@@ -285,7 +285,7 @@ def precipMass():
 
     return out_folder + "/precipitation_mass_" + s_time_stamp + ".tif"
 
-def snowDepth():
+def snow_depth():
     #Caclulate average snow depth values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratch_gdb + "/snowDepth_table1", "snowDepth_Table", "snow_depth > -500")
     arcpy.Statistics_analysis("snowDepth_Table", "in_memory/snowDepth_Table2", "snow_depth MEAN", "site_key")
@@ -345,7 +345,7 @@ def snowDepth():
 
     return out_folder + "/snow_depth_" + s_time_stamp + ".tif"
 
-def snowProperties():
+def snow_properties():
     if len(density_interp_values['features']) <= 1:
         #Density Equation: y = -0.0395(elevation) + 405.26
         snow_density_raster = -0.0395 * Raster(rc_elevation) + 405.26
@@ -401,7 +401,7 @@ def snowProperties():
 
     return out_folder + "/active_snow_layer_temperature_" + s_time_stamp + ".tif", out_folder + "/average_snow_cover_temperature_" + s_time_stamp + ".tif", out_folder + "/snow_density_" + s_time_stamp + ".tif"
 
-def soilTemperature():
+def soil_temperature():
     #Set extent to full feature class (all stations)
     arcpy.env.extent = ext_full_features
     #Caclulate average soil temperature values over the n-hour time step (ignore "no-data" values: -999)
@@ -438,7 +438,7 @@ def soilTemperature():
     return out_folder + "/soil_temperature_" + s_time_stamp + ".tif"
 
 
-def solarRadiation():
+def solar_radiation():
     #Caclulate average solar radiation values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratch_gdb + "/climate_table1", "solarRadiation_Table", "in_solar_radiation > -500")
     arcpy.Statistics_analysis("solarRadiation_Table", "in_memory/solarRadiation_Table2", "in_solar_radiation MEAN", "site_key")
@@ -499,7 +499,7 @@ def solarRadiation():
     return out_folder + "/solar_radiation_" + s_time_stamp + ".tif"
 
 
-def thermalRadiation(in_air_temperature, in_vapor_pressure, in_surface_temperature):
+def thermal_radiation(in_air_temperature, in_vapor_pressure, in_surface_temperature):
     #Constants and re-defined variables (See Marks and Dozier (1979), pg. 160)
     z = rc_elevation
     vf = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\Required_Data.gdb\RC_ViewFactor_10m_South'
@@ -592,7 +592,7 @@ def thermalRadiation(in_air_temperature, in_vapor_pressure, in_surface_temperatu
 
     return out_folder + "/thermal_radiation_" + s_time_stamp + ".tif"
 
-def vaporPressure():
+def vapor_pressure():
     #Caclulate average vapor pressure values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratch_gdb + "/climate_table1", "vaporPressure_Table", "vapor_pressure > -500")
     arcpy.Statistics_analysis("vaporPressure_Table", "in_memory/vaporPressure_Table2", "vapor_pressure MEAN", "site_key")
@@ -649,7 +649,7 @@ def vaporPressure():
 
     return out_folder + "/vapor_pressure_" + s_time_stamp + ".tif"
 
-def windSpeed(inDateTime):
+def wind_speed(inDateTime):
 
     #Caclulate average parameter values (wind speed, wind direction, air temperature) over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratch_gdb + "/climate_table1", "wind_Table", "air_temperature > -500 AND wind_speed_average > -500 AND wind_direction > -500")
@@ -744,14 +744,14 @@ def windSpeed(inDateTime):
 
     return out_folder + "/wind_speed_" + s_time_stamp + ".tif"
 
-def deleteScratch(in_list):
+def delete_scratch(in_list):
     for path in in_list:
         arcpy.Delete_management(path)
 
 #START MAIN SCRIPT
 #Calculate time range and number of time steps
-date_from = roundTime(datetime.datetime.strptime(s_from_date, "%Y-%m-%d %H:%M:%S"), 60*60)
-date_to = roundTime(datetime.datetime.strptime(s_to_date, "%Y-%m-%d %H:%M:%S"))
+date_from = round_time(datetime.datetime.strptime(s_from_date, "%Y-%m-%d %H:%M:%S"), 60*60)
+date_to = round_time(datetime.datetime.strptime(s_to_date, "%Y-%m-%d %H:%M:%S"))
 time_delta = date_to - date_from
 i_days = time_delta.days
 i_seconds = time_delta.seconds + (i_days * 86400)
@@ -804,7 +804,7 @@ delta = datetime.timedelta(hours=i_time_step)
 date_increment = date_from
 while date_increment < date_to:
     #Check which tables in the SQL database will have to be queried
-    if any([bool_all_tools, bool_air_temperature, bool_dew_point, bool_VaporPressure, bool_wind_speed, bool_solar_radiation, bool_thermal_radiation]):
+    if any([bool_all_tools, bool_air_temperature, bool_dew_point, bool_vapor_pressure, bool_wind_speed, bool_solar_radiation, bool_thermal_radiation]):
         ls_scratch_data_imd = []
 
         #Initiate parameter lists
@@ -872,21 +872,21 @@ while date_increment < date_to:
 
         #Run gridding functions
         if bool_air_temperature:
-            pathAirTemperature = airTemperature()
+            pathAirTemperature = air_temperature()
             ls_output.append(pathAirTemperature)
         if bool_dew_point:
-            pathDewPointTemperature, pathPercentSnow, pathPrecipSnowDensity = dewPoint()
+            pathDewPointTemperature, pathPercentSnow, pathPrecipSnowDensity = dew_point()
             ls_output.append(pathDewPointTemperature)
             ls_output.append(pathPercentSnow)
             ls_output.append(pathPrecipSnowDensity)
-        if bool_VaporPressure:
-            pathVaporPressure = vaporPressure()
+        if bool_vapor_pressure:
+            pathVaporPressure = vapor_pressure()
             ls_output.append(pathVaporPressure)
         if bool_wind_speed:
-            pathWindSpeed = windSpeed(s_from)
+            pathWindSpeed = wind_speed(s_from)
             ls_output.append(pathWindSpeed)
         if bool_solar_radiation:
-            pathSolarRadiation = solarRadiation()
+            pathSolarRadiation = solar_radiation()
             ls_output.append(pathSolarRadiation)
         if bool_thermal_radiation:
             #Query database for average air temperature for current day
@@ -897,13 +897,13 @@ while date_increment < date_to:
             dRefTemp = cur2.fetchone()[0]
             cur2.close()
 
-            pathThermalRadiation = thermalRadiation(pathAirTemperature, pathVaporPressure, dRefTemp)
+            pathThermalRadiation = thermal_radiation(pathAirTemperature, pathVaporPressure, dRefTemp)
 
             ls_output.append(pathThermalRadiation)
 
 
         #Delete intermediate scratch
-        deleteScratch(ls_scratch_data_imd)
+        delete_scratch(ls_scratch_data_imd)
 
     if any([bool_all_tools, bool_precip_mass]):
         ls_scratch_data_imd = []
@@ -955,11 +955,11 @@ while date_increment < date_to:
 
         #Run gridding functions
         if bool_precip_mass:
-            pathPrecipMass = precipMass()
+            pathPrecipMass = precip_mass()
             ls_output.append(pathPrecipMass)
 
         #Delete intermediate scratch
-        deleteScratch(ls_scratch_data_imd)
+        delete_scratch(ls_scratch_data_imd)
 
     if any([bool_all_tools, bool_soil_temperature]):
         ls_scratch_data_imd = []
@@ -1003,11 +1003,11 @@ while date_increment < date_to:
 
         #Run gridding functions
         if bool_soil_temperature:
-            pathSoilTemperature = soilTemperature()
+            pathSoilTemperature = soil_temperature()
             ls_output.append(pathSoilTemperature)
 
         #Delete intermediate scratch
-        deleteScratch(ls_scratch_data_imd)
+        delete_scratch(ls_scratch_data_imd)
 
     date_increment += delta
 
@@ -1060,15 +1060,15 @@ if any([bool_all_tools, bool_snow_depth]):
 
     #Run gridding functions
     if bool_snow_depth:
-        path_snow_depth = snowDepth()
+        path_snow_depth = snow_depth()
         ls_output.append(path_snow_depth)
 
     #Delete intermediate scratch
-    deleteScratch(ls_scratch_data_imd)
+    delete_scratch(ls_scratch_data_imd)
 
 #Snow properties:
 if bool_snow_properties:
-    pathULSnowTemperature, pathAverageSnowTemperature, pathSnowDensity = snowProperties()
+    pathULSnowTemperature, pathAverageSnowTemperature, pathSnowDensity = snow_properties()
     ls_output.append(pathULSnowTemperature)
     ls_output.append(pathAverageSnowTemperature)
     ls_output.append(pathSnowDensity)
@@ -1084,7 +1084,7 @@ if bool_constants:
 cnx.close()
 
 #Delete scratch data
-deleteScratch(ls_scratch_data)
+delete_scratch(ls_scratch_data)
 
 #Zip output folder and return as output zip file
 shutil.make_archive(out_folder,'zip',out_folder)
