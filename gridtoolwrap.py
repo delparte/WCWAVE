@@ -188,7 +188,7 @@ def download_output(id):
     r = requests.get(url)
     print(r.json())
     out_json = r.json()
-    for url in out_json['values']:
+    for url in out_json['value']:
         download(url['url'])
 
 #def download_output(out_json):
