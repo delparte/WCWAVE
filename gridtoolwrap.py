@@ -186,10 +186,9 @@ def download_output(id):
     url = (service_path +'/'
            'jobs/'+id+'/results/Output?f=json')
     r = requests.get(url)
-    print(r.json())
     out_json = r.json()
-    for url in out_json['value']:
-        download(url['url'])
+    for url, value in out_json['value'].iteritems():
+        download(value)
 
 #def download_output(out_json):
 #    """
