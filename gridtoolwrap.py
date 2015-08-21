@@ -214,7 +214,7 @@ def end_2_end(start_date, end_date, time_step=1):
                 soil_temperature="true", solar_radiation="false", thermal_radiation="true",
                 vapor_pressure="true", wind_speed="true")
     watch_status(job, sl=30)
-    print_message(job)
+    print_messages(job)
     download_output(job)
     print("Job Complete")
 
