@@ -44,6 +44,7 @@ boolWindSpeed = arcpy.GetParameter(20)
 #Specify workspace
 scratchWS = arcpy.env.scratchFolder
 arcpy.env.workspace = scratchWS
+arcpy.env.scratchWorkspace = scratchWS
 arcpy.AddMessage("Scratch Workspace: " + scratchWS)
 #scratchWS = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\scratch'
 #Make output folder to zip
@@ -668,7 +669,7 @@ def windSpeed(inDateTime):
 
 
     #Set up time parameters
-    ninjaPath = "C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe"
+#    ninjaPath = "C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe"  # Comment before publishing
     sWindDate = inDateTime.split(" ")[0]
     sWindTime = inDateTime.split(" ")[1]
     lsWindDate = sWindDate.split("-")
@@ -694,31 +695,33 @@ def windSpeed(inDateTime):
 
     #List arguments for WindNinja CLI
     args = []
-    args = [ninjaPath,
-    "--initialization_method", "pointInitialization",
-    "--elevation_file", r'C:\ReynoldsCreek\jd_elevation_filled.tif', #elevation raster (cannot contain any "no-data" values)
-    "--match_points", "false", #match simulations to points (simulation fails if set to true)
-    "--year", sWindYear,
-    "--month", sWindMonth,
-    "--day", sWindDay,
-    "--hour", sWindHour,
-    "--minute", sWindMinute,
-    "--mesh_resolution", output_cell_size, #Resolution of model calculations
-    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
-    "--time_zone", "America/Boise", #time zone of target simulation
-    "--diurnal_winds", "true", #consider diurnal cycles in calculations
-    "--write_goog_output", "false", #write kml output (boolean: true/false)
-    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
-    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
-    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
-    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
-    "--units_ascii_out_resolution", "m",
-    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
-    "--units_output_wind_height", "m", #units of output wind height
-    "--output_speed_units", "mps",
-    "--output_wind_height", "3",
-    "--wx_station_filename", scratchWS + "/wnStations.csv", #weather station csv file used in point initialization method
-    "--output_path", scratchWS] #path to output
+    ##Comment from here ---
+#    args = [ninjaPath,
+#    "--initialization_method", "pointInitialization",
+#    "--elevation_file", r'C:\ReynoldsCreek\jd_elevation_filled.tif', #elevation raster (cannot contain any "no-data" values)
+#    "--match_points", "false", #match simulations to points (simulation fails if set to true)
+#    "--year", sWindYear,
+#    "--month", sWindMonth,
+#    "--day", sWindDay,
+#    "--hour", sWindHour,
+#    "--minute", sWindMinute,
+#    "--mesh_resolution", output_cell_size, #Resolution of model calculations
+#    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
+#    "--time_zone", "America/Boise", #time zone of target simulation
+#    "--diurnal_winds", "true", #consider diurnal cycles in calculations
+#    "--write_goog_output", "false", #write kml output (boolean: true/false)
+#    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
+#    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
+#    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
+#    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
+#    "--units_ascii_out_resolution", "m",
+#    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
+#    "--units_output_wind_height", "m", #units of output wind height
+#    "--output_speed_units", "mps",
+#    "--output_wind_height", "3",
+#    "--wx_station_filename", scratchWS + "/wnStations.csv", #weather station csv file used in point initialization method
+#    "--output_path", scratchWS] #path to output
+    ## -- to here before publishing
 
     #run the WindNinja_cli.exe (output is written to same location as elevation raster)
     arcpy.AddMessage("Calling WindNinja command line interface")
