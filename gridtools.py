@@ -5,7 +5,7 @@ import sys
 import csv
 import traceback
 import numpy
-from scipy import stats
+#from scipy import stats
 import mysql.connector
 from mysql.connector import errorcode
 import datetime
@@ -43,6 +43,8 @@ boolWindSpeed = arcpy.GetParameter(20)
 
 #Specify workspace
 scratchWS = arcpy.env.scratchFolder
+arcpy.env.workspace = scratchWS
+arcpy.env.scratchWorkspace = scratchWS
 arcpy.AddMessage("Scratch Workspace: " + scratchWS)
 #scratchWS = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\scratch'
 #Make output folder to zip
@@ -485,7 +487,7 @@ def solarRadiation():
 def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp):
     #Constants and re-defined variables (See Marks and Dozier (1979), pg. 160)
     z = rc_elevation
-    vf = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\Required_Data.gdb\RC_ViewFactor_10m_South'
+    vf = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD'
     T_a = inAirTemperature
     vp = inVaporPressure
 
@@ -642,7 +644,8 @@ def windSpeed(inDateTime):
     del cursor
     del row
 
-
+    #Elevation tiff
+    elev_file = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
 
     #Set up time parameters
     #ninjaPath = "C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe"
@@ -673,7 +676,7 @@ def windSpeed(inDateTime):
     args = []
 ##    args = [ninjaPath,
 ##    "--initialization_method", "pointInitialization",
-##    "--elevation_file", r'C:\AA_Thesis_Project\ZZ_MySQL_Work\rc_elevation_filled.tif', #elevation raster (cannot contain any "no-data" values)
+##    "--elevation_file", elev_file, #elevation raster (cannot contain any "no-data" values)
 ##    "--match_points", "false", #match simulations to points (simulation fails if set to true)
 ##    "--year", sWindYear,
 ##    "--month", sWindMonth,
@@ -765,11 +768,11 @@ lsScratchData.append(fcStations_wElevation)
 ##    WFS_feature_type="station_locations", out_path=scratchGDB, out_name="station_locations")
 station_locations = scratchGDB + "/station_locations"
 lsScratchData.append(station_locations)
-arcpy.CopyFeatures_management(r'C:\Users\johawesl\Desktop\JD_Work\Required_Data.gdb\station_locations_JD2', station_locations)
+arcpy.CopyFeatures_management(r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD', station_locations)
 extFullFeatures = arcpy.Describe(scratchGDB + "/station_locations").extent
 #station_locations = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\Required_Data.gdb\station_locations'
 
-rc_elevation = r'C:\Users\johawesl\Desktop\JD_Work\Required_Data.gdb\JD_Clipped_10m_2'
+rc_elevation = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_JD'
 arcpy.env.cellSize = rc_elevation
 output_cell_size = arcpy.env.cellSize
 extElevation = arcpy.Describe(rc_elevation).extent
