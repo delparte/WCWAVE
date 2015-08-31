@@ -9,7 +9,7 @@ job_id = ''
 #service_path = ("http://miles.giscenter.isu.edu/arcgis/rest/services/WCWAVE_DEV/"
 #                "runGriddingTools/GPServer/Climate%20Data%20Gridding%20Tools")
 service_path = ('http://miles.giscenter.isu.edu/arcgis/rest/services/WCWAVE_DEV/'
-                'runGriddingTools/GPServer/Climate%20Data%20Gridding%20Tools/')
+                'runGriddingToolsJD/GPServer/Climate%20Data%20Gridding%20Tools/')
 
 def download(url):
     """
@@ -186,10 +186,9 @@ def download_output(id):
     url = (service_path +'/'
            'jobs/'+id+'/results/Output?f=json')
     r = requests.get(url)
-    print(r.json())
     out_json = r.json()
-    for url in out_json['values']:
-        download(url['url'])
+    for url, value in out_json['value'].iteritems():
+        download(value)
 
 #def download_output(out_json):
 #    """
@@ -202,6 +201,23 @@ def download_output(id):
 #    print(out_json)
 #    for url in out_json['value']:
 #        download(url['url'])
+
+def end_2_end(start_date, end_date, time_step=1):
+    """
+    Run all working tools from submitJob to download_output.
+
+    Currently only runs for tools that work.
+    """
+    job = submit_job(start_date, end_date, time_step, kriging_method="Empirical Bayesian",
+                air_temperature="true", constants="true", dew_point_temperature="false",
+                precipitation_mass="false", snow_depth="false", snow_properties="true",
+                soil_temperature="true", solar_radiation="false", thermal_radiation="true",
+                vapor_pressure="true", wind_speed="true")
+    watch_status(job, sl=30)
+    print_messages(job)
+    download_output(job)
+    print("Job Complete")
+
 
 if __name__ == '__main__':
     new_job = submit_job(from_date=u'1986-12-02 18:00:00',

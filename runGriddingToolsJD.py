@@ -1,11 +1,11 @@
 import arcpy
-from arcpy.sa import *
+from arcpy.sa import CreateConstantRaster, Kriging, KrigingModelOrdinary, RadiusFixed, Raster, Con, TimeWithinDay, AreaSolarRadiation
 import os
 import sys
 import csv
 import traceback
 import numpy
-from scipy import stats
+#from scipy import stats
 import mysql.connector
 from mysql.connector import errorcode
 import datetime
@@ -43,6 +43,8 @@ boolWindSpeed = arcpy.GetParameter(20)
 
 #Specify workspace
 scratchWS = arcpy.env.scratchFolder
+arcpy.env.workspace = scratchWS
+arcpy.env.scratchWorkspace = scratchWS
 arcpy.AddMessage("Scratch Workspace: " + scratchWS)
 #scratchWS = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\scratch'
 #Make output folder to zip
@@ -54,10 +56,6 @@ arcpy.AddMessage("Output Folder: " + outFolder)
 scratchGDB = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
 
-#SQL variables
-tmp3 = "ta"
-
-
 #Define Functions
 def roundTime(dt, roundTo=60):
     seconds = (dt - dt.min).seconds
@@ -65,6 +63,7 @@ def roundTime(dt, roundTo=60):
     return dt + datetime.timedelta(0,rounding-seconds,-dt.microsecond)
 
 def airTemperature():
+    arcpy.AddMessage("Calculating Air Temperature")
     #Caclulate average air temperatures over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "airTemperature_Table", "air_temperature > -500")
     arcpy.Statistics_analysis("airTemperature_Table", "in_memory/airTemperature_Table2", "air_temperature MEAN", "site_key")
@@ -76,6 +75,7 @@ def airTemperature():
     cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
     for row in cursor:
         if row.getValue("RASTERVALU") < 0 or row.getValue("RASTERVALU") == "None" or row.getValue("RASTERVALU") is None:
+            arcpy.AddMessage("Elevation: " + row.getValue("MEAN_air_temperature"))
             cursor.deleteRow(row)
     del cursor
     del row
@@ -83,39 +83,51 @@ def airTemperature():
     cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
     for row in cursor:
         if row.getValue("MEAN_air_temperature") is None:
+            arcpy.AddMessage("MEAN air temp: " + str(row.getValue("MEAN_air_temperature")) + "Site_Key:" + str(row.getValue("Site_Key")))
             cursor.deleteRow(row)
     del cursor
     del row
-
-    #Add unique ID field to tempStations for use in OLS function
-    arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
-    #Run ordinary least squares on tempStations
-    arcpy.CreateTable_management(scratchGDB, "coef_table")
-    ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_air_temperature","RASTERVALU", scratchGDB + "/coef_table","","")
-    lsScratchData_Imd.append(scratchGDB + "/coef_table")
-    intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
-    slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
-    #Calculate residuals and add them to tempStations
-    arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
-    for row in cursor:
-        row.setValue("residual", row.getValue("MEAN_air_temperature") - ((slope * row.getValue("RASTERVALU")) + intercept))
-        cursor.updateRow(row)
-    del cursor
-    del row
-    arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
-        out_raster=scratchGDB + "/airTemperature_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
-        overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
-        output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
-    lsScratchData_Imd.append(scratchGDB + "/airTemperature_residual")
-
-    output_raster = arcpy.Raster(scratchGDB + "/airTemperature_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
-    output_raster.save(outFolder + "/air_temperature_" + sTimeStamp + ".tif")
+    #Check if interpolation method is Empirical Bayesian or Detrended
+    if sKrigMethod == "Detrended":
+        #Add unique ID field to tempStations for use in OLS function
+        arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
+        #Run ordinary least squares on tempStations
+        arcpy.CreateTable_management(scratchGDB, "coef_table")
+        arcpy.AddMessage(scratchGDB + "/tempStations")
+        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_air_temperature","RASTERVALU", scratchGDB + "/coef_table","","")
+        lsScratchData_Imd.append(scratchGDB + "/coef_table")
+        # y = m * x + b 
+        #   y = Predicted parameter
+        #   m = slope
+        #   x = elevation
+        #   b = intercept
+        intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
+        slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
+        #Calculate residuals and add them to tempStations
+        arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
+        for row in cursor:
+            row.setValue("residual", row.getValue("MEAN_air_temperature") - ((slope * row.getValue("RASTERVALU")) + intercept))
+            cursor.updateRow(row)
+        del cursor
+        del row
+        #Run ordinary kriging on residuals (March 1, 2008 12:00 hard coded semi-variogram parameters)
+        arcpy.gp.Kriging_sa(scratchGDB + "/tempStations", "residual", scratchGDB + "/airTemperature_residual", "Linear 37.061494", output_cell_size, "VARIABLE 100", "")
+        lsScratchData_Imd.append(scratchGDB + "/airTemperature_residual")
+        #Add back elevation trends and save final raster
+        output_raster = arcpy.Raster(scratchGDB + "/airTemperature_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+        output_raster.save(outFolder + "/air_temperature_" + sTimeStamp + ".tif")
+    else:
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_air_temperature", out_ga_layer="#", \
+            out_raster=outFolder + "/air_temperature_" + sTimeStamp + ".tif", cell_size=output_cell_size, transformation_type="EMPIRICAL", max_local_points="100", \
+            overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
+            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
 
     return outFolder + "/air_temperature_" + sTimeStamp + ".tif"
 
 def constants():
+    arcpy.AddMessage("Calculating Constants")
     #Get coordinate system information
     desc = arcpy.Describe(rc_elevation)
     coordSystem = desc.spatialReference
@@ -129,6 +141,7 @@ def constants():
     return outFolder + "/roughness_length_" + sTimeStamp + ".tif", outFolder + "/H2O_saturation_" + sTimeStamp + ".tif"
 
 def dewPoint():
+    arcpy.AddMessage("Calculating Dew Point")
     #Caclulate average dew point temperature values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "dewPoint_Table", "dewpoint_temperature > -500")
     arcpy.Statistics_analysis("dewPoint_Table", "in_memory/dewPoint_Table2", "dewpoint_temperature MEAN", "site_key")
@@ -150,32 +163,38 @@ def dewPoint():
             cursor.deleteRow(row)
     del cursor
     del row
-
-    #Add unique ID field to tempStations for use in OLS function
-    arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
-    #Run ordinary least squares on tempStations
-    arcpy.CreateTable_management(scratchGDB, "coef_table")
-    ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_dewpoint_temperature","RASTERVALU", scratchGDB + "/coef_table","","")
-    lsScratchData_Imd.append(scratchGDB + "/coef_table")
-    intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
-    slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
-    #Calculate residuals and add them to tempStations
-    arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
-    for row in cursor:
-        row.setValue("residual", row.getValue("MEAN_dewpoint_temperature") - ((slope * row.getValue("RASTERVALU")) + intercept))
-        cursor.updateRow(row)
-    del cursor
-    del row
-    arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
-        out_raster=scratchGDB + "/dewPoint_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
-        overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
-        output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
-    lsScratchData_Imd.append(scratchGDB + "/dewPoint_residual")
-    #Add back elevation trends and save final raster
-    output_raster = arcpy.Raster(scratchGDB + "/dewPoint_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
-    output_raster.save(outFolder + "/dew_point_temperature_" + sTimeStamp + ".tif")
+    #Check if interpolation method is Empirical Bayesian or Detrended
+    if sKrigMethod == "Detrended":
+        #Add unique ID field to tempStations for use in OLS function
+        arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
+        #Run ordinary least squares on tempStations
+        arcpy.CreateTable_management(scratchGDB, "coef_table")
+        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_dewpoint_temperature","RASTERVALU", scratchGDB + "/coef_table","","")
+        lsScratchData_Imd.append(scratchGDB + "/coef_table")
+        intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
+        slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
+        #Calculate residuals and add them to tempStations
+        arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
+        for row in cursor:
+            row.setValue("residual", row.getValue("MEAN_dewpoint_temperature") - ((slope * row.getValue("RASTERVALU")) + intercept))
+            cursor.updateRow(row)
+        del cursor
+        del row
+        #Run ordinary kriging on residuals
+        #arcpy.gp.Kriging_sa(scratchGDB + "/tempStations", "residual", scratchGDB + "/dewPoint_residual", "Linear 37.061494", output_cell_size, "VARIABLE 100", "")
+        outKrig = Kriging(scratchGDB + "/tempStations", "residual", KrigingModelOrdinary("SPHERICAL", 460, 3686, .1214, .2192), output_cell_size, RadiusFixed(10000, 1))
+        outKrig.save(scratchGDB + "/dewPoint_residual")
+        lsScratchData_Imd.append(scratchGDB + "/dewPoint_residual")
+        #Add back elevation trends and save final raster
+        output_raster = arcpy.Raster(scratchGDB + "/dewPoint_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+        output_raster.save(outFolder + "/dew_point_temperature_" + sTimeStamp + ".tif")
+    else:
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_dewpoint_temperature", out_ga_layer="#", \
+            out_raster=outFolder + "/dew_point_temperature_" + sTimeStamp + ".tif", cell_size=output_cell_size, transformation_type="EMPIRICAL", max_local_points="100", \
+            overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
+            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
 
     #Create precipitation properties rasters (% precip as snow, density of snow portion of precip)
     #Percent snow conditional:
@@ -201,6 +220,7 @@ def dewPoint():
     return outFolder + "/dew_point_temperature_" + sTimeStamp + ".tif", outFolder + "/percent_snow_" + sTimeStamp + ".tif", outFolder + "/precipitation_snow_density_" + sTimeStamp + ".tif"
 
 def precipMass():
+    arcpy.AddMessage("Calculating Precipitation Mass")
     #Caclulate average precipitation values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/precipitation_table1", "precipitation_Table", "ppts > -500")
     arcpy.Statistics_analysis("precipitation_Table", "in_memory/precipitation_Table2", "ppts MEAN", "site_key")
@@ -222,35 +242,43 @@ def precipMass():
             cursor.deleteRow(row)
     del cursor
     del row
-
-    #Add unique ID field to tempStations for use in OLS function
-    arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
-    #Run ordinary least squares on tempStations
-    arcpy.CreateTable_management(scratchGDB, "coef_table")
-    ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_ppts","RASTERVALU", scratchGDB + "/coef_table","","")
-    lsScratchData_Imd.append(scratchGDB + "/coef_table")
-    intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
-    slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
-    #Calculate residuals and add them to tempStations
-    arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
-    for row in cursor:
-        row.setValue("residual", row.getValue("MEAN_ppts") - ((slope * row.getValue("RASTERVALU")) + intercept))
-        cursor.updateRow(row)
-    del cursor
-    del row
-    arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
-        out_raster=scratchGDB + "/precipitation_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
-        overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
-        output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
-    #Add back elevation trends and save final raster
-    output_raster = arcpy.Raster(scratchGDB + "/precipitation_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
-    output_raster.save(outFolder + "/precipitation_mass_" + sTimeStamp + ".tif")
+    #Check if interpolation method is Empirical Bayesian or Detrended
+    if sKrigMethod == "Detrended":
+        #Add unique ID field to tempStations for use in OLS function
+        arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
+        #Run ordinary least squares on tempStations
+        arcpy.CreateTable_management(scratchGDB, "coef_table")
+        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_ppts","RASTERVALU", scratchGDB + "/coef_table","","")
+        lsScratchData_Imd.append(scratchGDB + "/coef_table")
+        intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
+        slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
+        #Calculate residuals and add them to tempStations
+        arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
+        for row in cursor:
+            row.setValue("residual", row.getValue("MEAN_ppts") - ((slope * row.getValue("RASTERVALU")) + intercept))
+            cursor.updateRow(row)
+        del cursor
+        del row
+        #Run ordinary kriging on residuals
+        #arcpy.gp.Kriging_sa(scratchGDB + "/tempStations", "residual", scratchGDB + "/precipitation_residual", "Linear 37.061494", output_cell_size, "VARIABLE 100", "")
+        outKrig = Kriging(scratchGDB + "/tempStations", "residual", KrigingModelOrdinary("SPHERICAL", 460, 3686, .1214, .2192), output_cell_size, RadiusFixed(10000, 1))
+        outKrig.save(scratchGDB + "/precipitation_residual")
+        lsScratchData_Imd.append(scratchGDB + "/precipitation_residual")
+        #Add back elevation trends and save final raster
+        output_raster = arcpy.Raster(scratchGDB + "/precipitation_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+        output_raster.save(outFolder + "/precipitation_mass_" + sTimeStamp + ".tif")
+    else:
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_ppts", out_ga_layer="#", \
+            out_raster=outFolder + "/precipitation_mass_" + sTimeStamp + ".tif", cell_size=output_cell_size, transformation_type="EMPIRICAL", max_local_points="100", \
+            overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
+            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
 
     return outFolder + "/precipitation_mass_" + sTimeStamp + ".tif"
 
 def snowDepth():
+    arcpy.AddMessage("Calculating Snow Depth")
     #Caclulate average snow depth values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/snowDepth_table1", "snowDepth_Table", "snow_depth > -500")
     arcpy.Statistics_analysis("snowDepth_Table", "in_memory/snowDepth_Table2", "snow_depth MEAN", "site_key")
@@ -301,35 +329,17 @@ def snowDepth():
         output_raster = Con(imdRaster > 0, imdRaster, 0)
         output_raster.save(outFolder + "/snow_depth_" + sTimeStamp + ".tif")
     else:
-        #Add unique ID field to tempStations for use in OLS function
-        arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-        arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
-        #Run ordinary least squares on tempStations
-        arcpy.CreateTable_management(scratchGDB, "coef_table")
-        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_snow_depth","RASTERVALU", scratchGDB + "/coef_table","","")
-        lsScratchData_Imd.append(scratchGDB + "/coef_table")
-        intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
-        slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
-        #Calculate residuals and add them to tempStations
-        arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-        cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
-        for row in cursor:
-            row.setValue("residual", row.getValue("MEAN_snow_depth") - ((slope * row.getValue("RASTERVALU")) + intercept))
-            cursor.updateRow(row)
-        del cursor
-        del row
-        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
-            out_raster=scratchGDB + "/snowDepth_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_snow_depth", out_ga_layer="#", \
+            out_raster=scratchGDB + "/imdRaster", cell_size=output_cell_size, transformation_type="EMPIRICAL", max_local_points="100", \
             overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
-            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
-        #Add back elevation trends and save final raster
-        imdRaster = arcpy.Raster(scratchGDB + "/snowDepth_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
-        output_raster = Con(imdRaster > 0, imdRaster, 0)
+            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
+        output_raster = Con(Raster(scratchGDB + "/imdRaster") > 0, Raster(scratchGDB + "/imdRaster"), 0)
         output_raster.save(outFolder + "/snow_depth_" + sTimeStamp + ".tif")
 
     return outFolder + "/snow_depth_" + sTimeStamp + ".tif"
 
 def snowProperties():
+    arcpy.AddMessage("Calculating Snow Properties")
     if len(density_interp_values['features']) <= 1:
         #Density Equation: y = -0.0395(elevation) + 405.26
         snow_density_raster = -0.0395 * Raster(rc_elevation) + 405.26
@@ -386,28 +396,30 @@ def snowProperties():
     return outFolder + "/active_snow_layer_temperature_" + sTimeStamp + ".tif", outFolder + "/average_snow_cover_temperature_" + sTimeStamp + ".tif", outFolder + "/snow_density_" + sTimeStamp + ".tif"
 
 def soilTemperature():
+    arcpy.AddMessage("Calculating Soil Temperature")
     #Set extent to full feature class (all stations)
     arcpy.env.extent = extFullFeatures
     #Caclulate average soil temperature values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/soilTemperature_table1", "soilTemperature_Table", "stm005 > -500")
     arcpy.Statistics_analysis("soilTemperature_Table", "in_memory/soilTemperature_Table2", "stm005 MEAN", "site_key")
-    #Copy snow depth values to station feature class
-    arcpy.CopyFeatures_management(fcStations_wElevation, scratchGDB +"/tempStations")
-    lsScratchData_Imd.append(scratchGDB +"/tempStations")
-    arcpy.JoinField_management(scratchGDB +"/tempStations", "Site_Key", "in_memory/soilTemperature_Table2", "site_key", "MEAN_stm005")
+    #Copy soil temperature values to station feature class
+    fcStations4Soil = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD_soil'
+    arcpy.CopyFeatures_management(fcStations4Soil, scratchGDB +"/tempStations4soil")
+    lsScratchData_Imd.append(scratchGDB +"/tempStations4soil")
+    arcpy.JoinField_management(scratchGDB +"/tempStations4soil", "Site_Key", "in_memory/soilTemperature_Table2", "site_key", "MEAN_stm005")
     #Delete rows from station feature class that have null values for soil temperature
-    cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
+    cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations4soil")
     for row in cursor:
         if row.getValue("MEAN_stm005") is None:
             cursor.deleteRow(row)
     del cursor
     del row
     #Add unique ID field to tempStations for use in OLS function
-    arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
+    arcpy.AddField_management(scratchGDB +"/tempStations4soil", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+    arcpy.CalculateField_management(scratchGDB +"/tempStations4soil","Unique_ID","!OBJECTID!","PYTHON_9.3","")
     #Run ordinary least squares on tempStations
     arcpy.CreateTable_management(scratchGDB, "coef_table")
-    ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_stm005","RASTERVALU", scratchGDB + "/coef_table","","")
+    ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations4soil","Unique_ID","in_memory/fcResid","MEAN_stm005","Elevation",scratchGDB + "/coef_table","","")
     lsScratchData_Imd.append(scratchGDB + "/coef_table")
     intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
     slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
@@ -422,6 +434,7 @@ def soilTemperature():
 
 
 def solarRadiation():
+    arcpy.AddMessage("Calculating Solar Radiation")
     #Caclulate average solar radiation values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "solarRadiation_Table", "in_solar_radiation > -500")
     arcpy.Statistics_analysis("solarRadiation_Table", "in_memory/solarRadiation_Table2", "in_solar_radiation MEAN", "site_key")
@@ -483,9 +496,10 @@ def solarRadiation():
 
 
 def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp):
+    arcpy.AddMessage("Calculating Thermal Radiation")
     #Constants and re-defined variables (See Marks and Dozier (1979), pg. 160)
     z = rc_elevation
-    vf = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\Required_Data.gdb\RC_ViewFactor_10m_South'
+    vf = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD'
     T_a = inAirTemperature
     vp = inVaporPressure
 
@@ -576,6 +590,7 @@ def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp):
     return outFolder + "/thermal_radiation_" + sTimeStamp + ".tif"
 
 def vaporPressure():
+    arcpy.AddMessage("Calculating Vapor Pressure")
     #Caclulate average vapor pressure values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "vaporPressure_Table", "vapor_pressure > -500")
     arcpy.Statistics_analysis("vaporPressure_Table", "in_memory/vaporPressure_Table2", "vapor_pressure MEAN", "site_key")
@@ -597,33 +612,42 @@ def vaporPressure():
             cursor.deleteRow(row)
     del cursor
     del row
-
-    #Add unique ID field to tempStations for use in OLS function
-    arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
-    #Run ordinary least squares on tempStations
-    arcpy.CreateTable_management(scratchGDB, "coef_table")
-    ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_vapor_pressure","RASTERVALU", scratchGDB + "/coef_table","","")
-    lsScratchData_Imd.append(scratchGDB + "/coef_table")
-    intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
-    slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
-    #Calculate residuals and add them to tempStations
-    arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
-    for row in cursor:
-        row.setValue("residual", row.getValue("MEAN_vapor_pressure") - ((slope * row.getValue("RASTERVALU")) + intercept))
-        cursor.updateRow(row)
-    del cursor
-    arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
-        out_raster=scratchGDB + "/vaporPressure_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
-        overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
-        output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
-    lsScratchData_Imd.append(scratchGDB + "/vaporPressure_residual")
-    #Add back elevation trends and save final raster
-    output_raster = arcpy.Raster(scratchGDB + "/vaporPressure_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
-    output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
+    #Check if interpolation method is Empirical Bayesian or Detrended
+    if sKrigMethod == "Detrended":
+        #Add unique ID field to tempStations for use in OLS function
+        arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
+        #Run ordinary least squares on tempStations
+        arcpy.CreateTable_management(scratchGDB, "coef_table")
+        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_vapor_pressure","RASTERVALU", scratchGDB + "/coef_table","","")
+        lsScratchData_Imd.append(scratchGDB + "/coef_table")
+        intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
+        slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
+        #Calculate residuals and add them to tempStations
+        arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
+        for row in cursor:
+            row.setValue("residual", row.getValue("MEAN_vapor_pressure") - ((slope * row.getValue("RASTERVALU")) + intercept))
+            cursor.updateRow(row)
+        del cursor
+        del row
+        #Run ordinary kriging on residuals
+        #arcpy.gp.Kriging_sa(scratchGDB + "/tempStations", "residual", scratchGDB + "/vaporPressure_residual", "Linear 37.061494", output_cell_size, "VARIABLE 100", "")
+        outKrig = Kriging(scratchGDB + "/tempStations", "residual", KrigingModelOrdinary("SPHERICAL", 460, 3686, .1214, .2192), output_cell_size, RadiusFixed(10000, 1))
+        outKrig.save(scratchGDB + "/vaporPressure_residual")
+        lsScratchData_Imd.append(scratchGDB + "/vaporPressure_residual")
+        #Add back elevation trends and save final raster
+        output_raster = arcpy.Raster(scratchGDB + "/vaporPressure_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+        output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
+    else:
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_vapor_pressure", out_ga_layer="#", \
+            out_raster=outFolder + "/vapor_pressure_" + sTimeStamp + ".tif", cell_size=output_cell_size, transformation_type="EMPIRICAL", max_local_points="100", \
+            overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
+            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
 
     return outFolder + "/vapor_pressure_" + sTimeStamp + ".tif"
+
+
 
 def windSpeed(inDateTime):
 
@@ -642,10 +666,13 @@ def windSpeed(inDateTime):
     del cursor
     del row
 
+    #Elevation tiff
+    elev_file = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
+
 
 
     #Set up time parameters
-    #ninjaPath = "C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe"
+    ninjaPath = "C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe"
     sWindDate = inDateTime.split(" ")[0]
     sWindTime = inDateTime.split(" ")[1]
     lsWindDate = sWindDate.split("-")
@@ -671,31 +698,31 @@ def windSpeed(inDateTime):
 
     #List arguments for WindNinja CLI
     args = []
-##    args = [ninjaPath,
-##    "--initialization_method", "pointInitialization",
-##    "--elevation_file", r'C:\AA_Thesis_Project\ZZ_MySQL_Work\rc_elevation_filled.tif', #elevation raster (cannot contain any "no-data" values)
-##    "--match_points", "false", #match simulations to points (simulation fails if set to true)
-##    "--year", sWindYear,
-##    "--month", sWindMonth,
-##    "--day", sWindDay,
-##    "--hour", sWindHour,
-##    "--minute", sWindMinute,
-##    "--mesh_resolution", output_cell_size, #Resolution of model calculations
-##    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
-##    "--time_zone", "America/Boise", #time zone of target simulation
-##    "--diurnal_winds", "true", #consider diurnal cycles in calculations
-##    "--write_goog_output", "false", #write kml output (boolean: true/false)
-##    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
-##    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
-##    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
-##    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
-##    "--units_ascii_out_resolution", "m",
-##    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
-##    "--units_output_wind_height", "m", #units of output wind height
-##    "--output_speed_units", "mps",
-##    "--output_wind_height", "3",
-##    "--wx_station_filename", scratchWS + "/wnStations.csv", #weather station csv file used in point initialization method
-##    "--output_path", scratchWS] #path to output
+    args = [ninjaPath,
+    "--initialization_method", "pointInitialization",
+    "--elevation_file", elev_file, #elevation raster (cannot contain any "no-data" values)
+    "--match_points", "false", #match simulations to points (simulation fails if set to true)
+    "--year", sWindYear,
+    "--month", sWindMonth,
+    "--day", sWindDay,
+    "--hour", sWindHour,
+    "--minute", sWindMinute,
+    "--mesh_resolution", output_cell_size, #Resolution of model calculations
+    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
+    "--time_zone", "America/Boise", #time zone of target simulation
+    "--diurnal_winds", "true", #consider diurnal cycles in calculations
+    "--write_goog_output", "false", #write kml output (boolean: true/false)
+    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
+    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
+    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
+    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
+    "--units_ascii_out_resolution", "m",
+    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
+    "--units_output_wind_height", "m", #units of output wind height
+    "--output_speed_units", "mps",
+    "--output_wind_height", "3",
+    "--wx_station_filename", scratchWS + "/wnStations.csv", #weather station csv file used in point initialization method
+    "--output_path", scratchWS] #path to output
 
     #run the WindNinja_cli.exe (output is written to same location as elevation raster)
     arcpy.AddMessage("Calling WindNinja command line interface")
@@ -715,10 +742,11 @@ def windSpeed(inDateTime):
 
     #Get coordinate system information
     desc = arcpy.Describe(rc_elevation)
-    coordSystem = desc.spatialReference
-    arcpy.DefineProjection_management(outFolder + "/wind_speed_" + sTimeStamp + ".tif", coordSystem)
+    coord_system = desc.spatialReference
+    arcpy.DefineProjection_management(outFolder + "/wind_speed_" + sTimeStamp + ".tif", coord_system)
 
     return outFolder + "/wind_speed_" + sTimeStamp + ".tif"
+
 
 def deleteScratch(inList):
     for path in inList:
@@ -761,15 +789,15 @@ lsOutput = []
 #Create master station feature class that will be copied for each gridding function
 fcStations_wElevation = scratchGDB + "/stations_wElevation"
 lsScratchData.append(fcStations_wElevation)
-##arcpy.WFSToFeatureClass_conversion(input_WFS_server="https://miles-gis-sandbox.northwestknowledge.net/arcgis/services/WCWAVE/rc_data_mapService/MapServer/WFSServer", \
-##    WFS_feature_type="station_locations", out_path=scratchGDB, out_name="station_locations")
-station_locations = scratchGDB + "/station_locations"
-lsScratchData.append(station_locations)
-arcpy.CopyFeatures_management(r'C:\Users\johawesl\Desktop\JD_Work\Required_Data.gdb\station_locations_JD2', station_locations)
-extFullFeatures = arcpy.Describe(scratchGDB + "/station_locations").extent
-#station_locations = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\Required_Data.gdb\station_locations'
+#arcpy.WFSToFeatureClass_conversion(input_WFS_server="https://miles-gis-sandbox.northwestknowledge.net/arcgis/services/WCWAVE/rc_data_mapService/MapServer/WFSServer", \
+#    WFS_feature_type="station_locations", out_path=scratchGDB, out_name="station_locations")
+#station_locations = scratchGDB + "/station_locations"
+#lsScratchData.append(station_locations)
+#extFullFeatures = arcpy.Describe(scratchGDB + "/station_locations").extent
+station_locations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD'
+extFullFeatures = arcpy.Describe(station_locations).extent
 
-rc_elevation = r'C:\Users\johawesl\Desktop\JD_Work\Required_Data.gdb\JD_Clipped_10m_2'
+rc_elevation = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_JD'
 arcpy.env.cellSize = rc_elevation
 output_cell_size = arcpy.env.cellSize
 extElevation = arcpy.Describe(rc_elevation).extent
@@ -799,7 +827,7 @@ while dateIncrement < dateTo:
         sTimeStamp = dateIncrement.strftime("%Y%m%d_%H")
         dateToTemp = dateIncrement + delta
         sTo = dateToTemp.strftime("%Y-%m-%d %H:%M:%S")
-        sQuery = "SELECT * FROM weather WHERE date_time >= '" + sFrom + "' AND date_time < '" + sTo + "'"
+        sQuery = "SELECT Site_Key, date_time, ta, ea, td, si, ws, wd FROM weather WHERE date_time >= '" + sFrom + "' AND date_time < '" + sTo + "'"
         cur = cnx.cursor()
         cur.execute(sQuery)
         iNumReturn = cur.rowcount
@@ -811,12 +839,12 @@ while dateIncrement < dateTo:
             row = cur.fetchone()
             lsSiteKey.append(row[0])
             lsDatetime.append(row[1])
-            lsAirTemperature.append(row[8])
-            lsVaporPressure.append(row[10])
-            lsDewpoint.append(row[11])
-            lsSolarRadiation.append(row[12])
-            lsWindSpeed.append(row[13])
-            lsWindDirection.append(row[14])
+            lsAirTemperature.append(row[2])
+            lsVaporPressure.append(row[3])
+            lsDewpoint.append(row[4])
+            lsSolarRadiation.append(row[5])
+            lsWindSpeed.append(row[6])
+            lsWindDirection.append(row[7])
         cur.close()
 
         #Build climate table to pass to gridding tools
@@ -831,7 +859,7 @@ while dateIncrement < dateTo:
         arcpy.AddField_management(scratchGDB + "/climate_table1", "wind_direction", "FLOAT")
         lsScratchData_Imd.append(scratchGDB + "/climate_table1")
 
-        #Add values from parameter lists to climate table
+        #Add values from parameter lists to cliemate table
         inCursor = arcpy.InsertCursor(scratchGDB + "/climate_table1")
         for j in range(0, iNumReturn):
             row = inCursor.newRow()
@@ -863,12 +891,20 @@ while dateIncrement < dateTo:
             pathWindSpeed = windSpeed(sFrom)
             lsOutput.append(pathWindSpeed)
         if boolSolarRadiation:
-            pathSolarRadiation = solarRadiation()
-            lsOutput.append(pathSolarRadiation)
+            try:
+                pathSolarRadiation = solarRadiation()
+                lsOutput.append(pathSolarRadiation)
+            except Exception as e:
+                if "010003" in e.message:
+                    arcpy.AddMessage("Skip Solar Radiation at night")
+                    traceback.print_exc(file=sys.stdout)
+                else:
+                    print("Traceback")
+                    traceback.print_exc(file=sys.stdout)
         if boolThermalRadiation:
             #Query database for average air temperature for current day
             sFromTR = dateIncrement.strftime("%Y-%m-%d")
-            sQuery2 = "SELECT AVG(NULLIF(" + tmp3 + ", -999)) FROM weather WHERE date_time >= '" + sFromTR + " 00:00:00" + "' AND date_time <= '" + sFromTR + " 23:00:00'"
+            sQuery2 = "SELECT AVG(NULLIF(ta, -999)) FROM weather WHERE date_time >= '" + sFromTR + " 00:00:00" + "' AND date_time <= '" + sFromTR + " 23:00:00'"
             cur2 = cnx.cursor()
             cur2.execute(sQuery2)
             dRefTemp = cur2.fetchone()[0]
@@ -959,7 +995,7 @@ while dateIncrement < dateTo:
         for i in range(0,iNumReturn):
             row = cur.fetchone()
             lsSiteKey.append(row[0])
-            lsSoilTemp.append(row[3]) #Column 3 is temperature at 5 cm depth
+            lsSoilTemp.append(row[3]) #Column 4 is temperature at 10 cm depth
         cur.close()
 
         #Build soil temperature table to pass to gridding tools
@@ -1011,12 +1047,12 @@ if any([boolAllTools, boolSnowDepth]):
     cur = cnx.cursor()
     cur.execute(sQuery)
     iNumReturn = cur.rowcount
-
+    arcpy.AddMessage("Number of values: " + str(iNumReturn))
     #Append query results to parameter lists
     for i in range(0,iNumReturn):
         row = cur.fetchone()
         lsSiteKey.append(row[0])
-        lsSnowDepth.append(row[8])
+        lsSnowDepth.append(row[-1])
     cur.close()
 
     #Build snow depth table to pass to gridding tools
@@ -1071,5 +1107,3 @@ shutil.make_archive(outFolder,'zip',outFolder)
 
 #Set output parameter as list of output
 arcpy.SetParameterAsText(21, outFolder + ".zip")
-
-
