@@ -44,6 +44,7 @@ boolWindSpeed = arcpy.GetParameter(20)
 #Specify workspace
 scratchWS = arcpy.env.scratchFolder
 arcpy.env.workspace = scratchWS
+arcpy.env.scratchWorkspace = scratchWS
 arcpy.AddMessage("Scratch Workspace: " + scratchWS)
 #scratchWS = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\scratch'
 #Make output folder to zip
@@ -665,6 +666,9 @@ def windSpeed(inDateTime):
     del cursor
     del row
 
+    #Elevation tiff
+    elev_file = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
+
 
 
     #Set up time parameters
@@ -696,7 +700,7 @@ def windSpeed(inDateTime):
     args = []
     args = [ninjaPath,
     "--initialization_method", "pointInitialization",
-    "--elevation_file", r'C:\ReynoldsCreek\jd_elevation_filled.tif', #elevation raster (cannot contain any "no-data" values)
+    "--elevation_file", elev_file, #elevation raster (cannot contain any "no-data" values)
     "--match_points", "false", #match simulations to points (simulation fails if set to true)
     "--year", sWindYear,
     "--month", sWindMonth,
@@ -1043,11 +1047,10 @@ if any([boolAllTools, boolSnowDepth]):
     cur = cnx.cursor()
     cur.execute(sQuery)
     iNumReturn = cur.rowcount
-
+    arcpy.AddMessage("Number of values: " + str(iNumReturn))
     #Append query results to parameter lists
     for i in range(0,iNumReturn):
         row = cur.fetchone()
-        arcpy.AddMessage(row)
         lsSiteKey.append(row[0])
         lsSnowDepth.append(row[-1])
     cur.close()
