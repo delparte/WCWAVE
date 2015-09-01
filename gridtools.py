@@ -39,6 +39,8 @@ boolSolarRadiation = arcpy.GetParameter(17)
 boolThermalRadiation = arcpy.GetParameter(18)
 boolVaporPressure = arcpy.GetParameter(19)
 boolWindSpeed = arcpy.GetParameter(20)
+
+sWatershed = arcpy.GetParameterAsText(22)
 #tempOutput = arcpy.GetParameterAsText(16)
 
 #Specify workspace
@@ -484,10 +486,10 @@ def solarRadiation():
     return outFolder + "/solar_radiation_" + sTimeStamp + ".tif"
 
 
-def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp):
+def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp, v_factor):
     #Constants and re-defined variables (See Marks and Dozier (1979), pg. 160)
     z = rc_elevation
-    vf = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD'
+    vf = v_factor
     T_a = inAirTemperature
     vp = inVaporPressure
 
@@ -627,7 +629,7 @@ def vaporPressure():
 
     return outFolder + "/vapor_pressure_" + sTimeStamp + ".tif"
 
-def windSpeed(inDateTime):
+def windSpeed(inDateTime, elevation):
 
     #Caclulate average parameter values (wind speed, wind direction, air temperature) over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "wind_Table", "air_temperature > -500 AND wind_speed_average > -500 AND wind_direction > -500")
@@ -645,8 +647,7 @@ def windSpeed(inDateTime):
     del row
 
     #Elevation tiff
-    elev_file = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
-
+    elev_file = elevation
     #Set up time parameters
     #ninjaPath = "C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe"
     sWindDate = inDateTime.split(" ")[0]
@@ -738,11 +739,35 @@ iMinutes = iSeconds / 60
 iHours = iMinutes / 60
 iNumSteps = iHours / iTimeStep
 
+#Initialize all Relevant Data from the Geodatabase based on chosen watershed
+
+stations = ''
+elev_tiff = ''
+dem = ''
+view_factor = ''
+db = ''
+
+if sWatershed == "Johnston Draw":
+    arcpy.AddMessage("Johnston Draw Watershed")
+    stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD'
+    elev_tiff = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
+    dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_JD'
+    view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD' 
+    db = 'jd_data'
+
+elif sWatershed == "Reynolds Creek":
+    arcpy.AddMessage("Reynolds Creed Watershed")
+    stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations'
+    elev_tiff = r'C:\ReynoldsCreek\rc_elevation_filled.tif'
+    dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_South'
+    view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10M_South'
+    db = 'rc_data'
+
 #connect to MySQL database
 try:
   cnx = mysql.connector.connect(user='root', password='',
                                 host='localhost',
-                                database='jd_data',
+                                database=db,
                                 buffered=True)
 except mysql.connector.Error as err:
 
@@ -768,11 +793,11 @@ lsScratchData.append(fcStations_wElevation)
 ##    WFS_feature_type="station_locations", out_path=scratchGDB, out_name="station_locations")
 station_locations = scratchGDB + "/station_locations"
 lsScratchData.append(station_locations)
-arcpy.CopyFeatures_management(r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD', station_locations)
+arcpy.CopyFeatures_management(stations, station_locations)
 extFullFeatures = arcpy.Describe(scratchGDB + "/station_locations").extent
 #station_locations = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\Required_Data.gdb\station_locations'
 
-rc_elevation = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_JD'
+rc_elevation = dem
 arcpy.env.cellSize = rc_elevation
 output_cell_size = arcpy.env.cellSize
 extElevation = arcpy.Describe(rc_elevation).extent
@@ -863,7 +888,7 @@ while dateIncrement < dateTo:
             pathVaporPressure = vaporPressure()
             lsOutput.append(pathVaporPressure)
         if boolWindSpeed:
-            pathWindSpeed = windSpeed(sFrom)
+            pathWindSpeed = windSpeed(sFrom, elev_tiff)
             lsOutput.append(pathWindSpeed)
         if boolSolarRadiation:
             pathSolarRadiation = solarRadiation()
@@ -877,7 +902,7 @@ while dateIncrement < dateTo:
             dRefTemp = cur2.fetchone()[0]
             cur2.close()
 
-            pathThermalRadiation = thermalRadiation(pathAirTemperature, pathVaporPressure, dRefTemp)
+            pathThermalRadiation = thermalRadiation(pathAirTemperature, pathVaporPressure, dRefTemp, view_factor)
 
             lsOutput.append(pathThermalRadiation)
 
