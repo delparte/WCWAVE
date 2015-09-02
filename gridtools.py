@@ -837,14 +837,24 @@ while dateIncrement < dateTo:
         #Append query results to parameter lists
         for i in range(0,iNumReturn):
             row = cur.fetchone()
-            lsSiteKey.append(row[0])
-            lsDatetime.append(row[1])
-            lsAirTemperature.append(row[8])
-            lsVaporPressure.append(row[10])
-            lsDewpoint.append(row[11])
-            lsSolarRadiation.append(row[12])
-            lsWindSpeed.append(row[13])
-            lsWindDirection.append(row[14])
+            if sWatershed == "Johnston Draw":
+                lsSiteKey.append(row[0])
+                lsDatetime.append(row[1])
+                lsAirTemperature.append(row[8])
+                lsVaporPressure.append(row[10])
+                lsDewpoint.append(row[11])
+                lsSolarRadiation.append(row[12])
+                lsWindSpeed.append(row[13])
+                lsWindDirection.append(row[14])
+            elif sWatershed == "Reynolds Creek":
+                lsSiteKey.append(row[0])
+                lsDatetime.append(row[1])
+                lsAirTemperature.append(row[9])
+                lsVaporPressure.append(row[11])
+                lsDewpoint.append(row[12])
+                lsSolarRadiation.append(row[13])
+                lsWindSpeed.append(row[14])
+                lsWindDirection.append(row[15])
         cur.close()
 
         #Build climate table to pass to gridding tools
@@ -1044,7 +1054,7 @@ if any([boolAllTools, boolSnowDepth]):
     for i in range(0,iNumReturn):
         row = cur.fetchone()
         lsSiteKey.append(row[0])
-        lsSnowDepth.append(row[8])
+        lsSnowDepth.append(row[-1]) # zs is usually the last column 
     cur.close()
 
     #Build snow depth table to pass to gridding tools
