@@ -67,6 +67,7 @@ def roundTime(dt, roundTo=60):
     return dt + datetime.timedelta(0,rounding-seconds,-dt.microsecond)
 
 def airTemperature():
+    arcpy.AddMessage("Calculating Air Temperature")
     #Caclulate average air temperatures over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "airTemperature_Table", "air_temperature > -500")
     arcpy.Statistics_analysis("airTemperature_Table", "in_memory/airTemperature_Table2", "air_temperature MEAN", "site_key")
@@ -118,6 +119,7 @@ def airTemperature():
     return outFolder + "/air_temperature_" + sTimeStamp + ".tif"
 
 def constants():
+    arcpy.AddMessage("Calculating Constants") 
     #Get coordinate system information
     desc = arcpy.Describe(rc_elevation)
     coordSystem = desc.spatialReference
@@ -131,6 +133,7 @@ def constants():
     return outFolder + "/roughness_length_" + sTimeStamp + ".tif", outFolder + "/H2O_saturation_" + sTimeStamp + ".tif"
 
 def dewPoint():
+    arcpy.AddMessage("Calculating Dew Point") 
     #Caclulate average dew point temperature values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "dewPoint_Table", "dewpoint_temperature > -500")
     arcpy.Statistics_analysis("dewPoint_Table", "in_memory/dewPoint_Table2", "dewpoint_temperature MEAN", "site_key")
@@ -203,6 +206,7 @@ def dewPoint():
     return outFolder + "/dew_point_temperature_" + sTimeStamp + ".tif", outFolder + "/percent_snow_" + sTimeStamp + ".tif", outFolder + "/precipitation_snow_density_" + sTimeStamp + ".tif"
 
 def precipMass():
+    arcpy.AddMessage("Calculating Precipitation Mass") 
     #Caclulate average precipitation values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/precipitation_table1", "precipitation_Table", "ppts > -500")
     arcpy.Statistics_analysis("precipitation_Table", "in_memory/precipitation_Table2", "ppts MEAN", "site_key")
@@ -253,6 +257,7 @@ def precipMass():
     return outFolder + "/precipitation_mass_" + sTimeStamp + ".tif"
 
 def snowDepth():
+    arcpy.AddMessage("Calculating Snow Depth") 
     #Caclulate average snow depth values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/snowDepth_table1", "snowDepth_Table", "snow_depth > -500")
     arcpy.Statistics_analysis("snowDepth_Table", "in_memory/snowDepth_Table2", "snow_depth MEAN", "site_key")
@@ -332,6 +337,7 @@ def snowDepth():
     return outFolder + "/snow_depth_" + sTimeStamp + ".tif"
 
 def snowProperties():
+    arcpy.AddMessage("Calculating Snow Properties") 
     if len(density_interp_values['features']) <= 1:
         #Density Equation: y = -0.0395(elevation) + 405.26
         snow_density_raster = -0.0395 * Raster(rc_elevation) + 405.26
@@ -388,6 +394,7 @@ def snowProperties():
     return outFolder + "/active_snow_layer_temperature_" + sTimeStamp + ".tif", outFolder + "/average_snow_cover_temperature_" + sTimeStamp + ".tif", outFolder + "/snow_density_" + sTimeStamp + ".tif"
 
 def soilTemperature():
+    arcpy.AddMessage("Calculating Soil Temperature") 
     #Set extent to full feature class (all stations)
     arcpy.env.extent = extFullFeatures
     #Caclulate average soil temperature values over the n-hour time step (ignore "no-data" values: -999)
@@ -424,6 +431,7 @@ def soilTemperature():
 
 
 def solarRadiation():
+    arcpy.AddMessage("Calculating Solar Radiation") 
     #Caclulate average solar radiation values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "solarRadiation_Table", "in_solar_radiation > -500")
     arcpy.Statistics_analysis("solarRadiation_Table", "in_memory/solarRadiation_Table2", "in_solar_radiation MEAN", "site_key")
@@ -485,6 +493,7 @@ def solarRadiation():
 
 
 def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp):
+    arcpy.AddMessage("Calculating Thermal Radiation") 
     #Constants and re-defined variables (See Marks and Dozier (1979), pg. 160)
     z = rc_elevation
     vf = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD'
@@ -578,6 +587,7 @@ def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp):
     return outFolder + "/thermal_radiation_" + sTimeStamp + ".tif"
 
 def vaporPressure():
+    arcpy.AddMessage("Calculating Vapor Pressure") 
     #Caclulate average vapor pressure values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "vaporPressure_Table", "vapor_pressure > -500")
     arcpy.Statistics_analysis("vaporPressure_Table", "in_memory/vaporPressure_Table2", "vapor_pressure MEAN", "site_key")
@@ -628,7 +638,7 @@ def vaporPressure():
     return outFolder + "/vapor_pressure_" + sTimeStamp + ".tif"
 
 def windSpeed(inDateTime):
-
+    arcpy.AddMessage("Calculating Wind Speed") 
     #Caclulate average parameter values (wind speed, wind direction, air temperature) over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "wind_Table", "air_temperature > -500 AND wind_speed_average > -500 AND wind_direction > -500")
     arcpy.Statistics_analysis("wind_Table", "in_memory/wind_Table2", [["air_temperature", "MEAN"], ["wind_speed_average", "MEAN"], ["wind_direction", "MEAN"]], "site_key")
