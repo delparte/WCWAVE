@@ -14,33 +14,33 @@ import shutil
 import subprocess
 
 #Assign input parameters
-sFromDate = arcpy.GetParameterAsText(0)
-sToDate = arcpy.GetParameterAsText(1)
-iTimeStep = int(arcpy.GetParameterAsText(2))
-sKrigMethod = arcpy.GetParameterAsText(3)
-boolAllTools = arcpy.GetParameter(4)
-boolAirTemperature = arcpy.GetParameter(5)
+sWatershed = arcpy.GetParameterAsText(0)
+sFromDate = arcpy.GetParameterAsText(1)
+sToDate = arcpy.GetParameterAsText(2)
+iTimeStep = int(arcpy.GetParameterAsText(3))
+sKrigMethod = arcpy.GetParameterAsText(4)
+boolAllTools = arcpy.GetParameter(5)
+boolAirTemperature = arcpy.GetParameter(6)
 
-boolConstants = arcpy.GetParameter(6)
-dRLConstant = arcpy.GetParameter(7)
-dH2OConstant = arcpy.GetParameter(8)
+boolConstants = arcpy.GetParameter(7)
+dRLConstant = arcpy.GetParameter(8)
+dH2OConstant = arcpy.GetParameter(9)
 
-boolDewPoint = arcpy.GetParameter(9)
-boolPrecipMass = arcpy.GetParameter(10)
-boolSnowDepth = arcpy.GetParameter(11)
+boolDewPoint = arcpy.GetParameter(10)
+boolPrecipMass = arcpy.GetParameter(11)
+boolSnowDepth = arcpy.GetParameter(12)
 
-boolSnowProperties = arcpy.GetParameter(12)
-ll_interp_values = json.loads(arcpy.GetParameter(13).JSON)
-ul_interp_values = json.loads(arcpy.GetParameter(14).JSON)
-density_interp_values = json.loads(arcpy.GetParameter(15).JSON)
+boolSnowProperties = arcpy.GetParameter(13)
+ll_interp_values = json.loads(arcpy.GetParameter(14).JSON)
+ul_interp_values = json.loads(arcpy.GetParameter(15).JSON)
+density_interp_values = json.loads(arcpy.GetParameter(16).JSON)
 
-boolSoilTemperature = arcpy.GetParameter(16)
-boolSolarRadiation = arcpy.GetParameter(17)
-boolThermalRadiation = arcpy.GetParameter(18)
-boolVaporPressure = arcpy.GetParameter(19)
-boolWindSpeed = arcpy.GetParameter(20)
+boolSoilTemperature = arcpy.GetParameter(17)
+boolSolarRadiation = arcpy.GetParameter(18)
+boolThermalRadiation = arcpy.GetParameter(19)
+boolVaporPressure = arcpy.GetParameter(20)
+boolWindSpeed = arcpy.GetParameter(21)
 
-sWatershed = arcpy.GetParameterAsText(22)
 #tempOutput = arcpy.GetParameterAsText(16)
 
 #Specify workspace
@@ -1108,6 +1108,6 @@ shutil.make_archive(outFolder,'zip',outFolder)
 
 
 #Set output parameter as list of output
-arcpy.SetParameterAsText(21, outFolder + ".zip")
+arcpy.SetParameterAsText(22, outFolder + ".zip")
 
 
