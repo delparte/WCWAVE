@@ -14,31 +14,33 @@ import shutil
 import subprocess
 
 #Assign input parameters
-sFromDate = arcpy.GetParameterAsText(0)
-sToDate = arcpy.GetParameterAsText(1)
-iTimeStep = int(arcpy.GetParameterAsText(2))
-sKrigMethod = arcpy.GetParameterAsText(3)
-boolAllTools = arcpy.GetParameter(4)
-boolAirTemperature = arcpy.GetParameter(5)
+sWatershed = arcpy.GetParameterAsText(0)
+sFromDate = arcpy.GetParameterAsText(1)
+sToDate = arcpy.GetParameterAsText(2)
+iTimeStep = int(arcpy.GetParameterAsText(3))
+sKrigMethod = arcpy.GetParameterAsText(4)
+boolAllTools = arcpy.GetParameter(5)
+boolAirTemperature = arcpy.GetParameter(6)
 
-boolConstants = arcpy.GetParameter(6)
-dRLConstant = arcpy.GetParameter(7)
-dH2OConstant = arcpy.GetParameter(8)
+boolConstants = arcpy.GetParameter(7)
+dRLConstant = arcpy.GetParameter(8)
+dH2OConstant = arcpy.GetParameter(9)
 
-boolDewPoint = arcpy.GetParameter(9)
-boolPrecipMass = arcpy.GetParameter(10)
-boolSnowDepth = arcpy.GetParameter(11)
+boolDewPoint = arcpy.GetParameter(10)
+boolPrecipMass = arcpy.GetParameter(11)
+boolSnowDepth = arcpy.GetParameter(12)
 
-boolSnowProperties = arcpy.GetParameter(12)
-ll_interp_values = json.loads(arcpy.GetParameter(13).JSON)
-ul_interp_values = json.loads(arcpy.GetParameter(14).JSON)
-density_interp_values = json.loads(arcpy.GetParameter(15).JSON)
+boolSnowProperties = arcpy.GetParameter(13)
+ll_interp_values = json.loads(arcpy.GetParameter(14).JSON)
+ul_interp_values = json.loads(arcpy.GetParameter(15).JSON)
+density_interp_values = json.loads(arcpy.GetParameter(16).JSON)
 
-boolSoilTemperature = arcpy.GetParameter(16)
-boolSolarRadiation = arcpy.GetParameter(17)
-boolThermalRadiation = arcpy.GetParameter(18)
-boolVaporPressure = arcpy.GetParameter(19)
-boolWindSpeed = arcpy.GetParameter(20)
+boolSoilTemperature = arcpy.GetParameter(17)
+boolSolarRadiation = arcpy.GetParameter(18)
+boolThermalRadiation = arcpy.GetParameter(19)
+boolVaporPressure = arcpy.GetParameter(20)
+boolWindSpeed = arcpy.GetParameter(21)
+
 #tempOutput = arcpy.GetParameterAsText(16)
 
 #Specify workspace
@@ -491,12 +493,11 @@ def solarRadiation():
 
     return outFolder + "/solar_radiation_" + sTimeStamp + ".tif"
 
-
-def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp):
+def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp, v_factor):
     arcpy.AddMessage("Calculating Thermal Radiation") 
     #Constants and re-defined variables (See Marks and Dozier (1979), pg. 160)
     z = rc_elevation
-    vf = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD'
+    vf = v_factor
     T_a = inAirTemperature
     vp = inVaporPressure
 
@@ -637,7 +638,7 @@ def vaporPressure():
 
     return outFolder + "/vapor_pressure_" + sTimeStamp + ".tif"
 
-def windSpeed(inDateTime):
+def windSpeed(inDateTime, elevation):
     arcpy.AddMessage("Calculating Wind Speed") 
     #Caclulate average parameter values (wind speed, wind direction, air temperature) over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "wind_Table", "air_temperature > -500 AND wind_speed_average > -500 AND wind_direction > -500")
@@ -655,8 +656,7 @@ def windSpeed(inDateTime):
     del row
 
     #Elevation tiff
-    elev_file = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
-
+    elev_file = elevation
     #Set up time parameters
     #ninjaPath = "C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe"
     sWindDate = inDateTime.split(" ")[0]
@@ -748,11 +748,35 @@ iMinutes = iSeconds / 60
 iHours = iMinutes / 60
 iNumSteps = iHours / iTimeStep
 
+#Initialize all Relevant Data from the Geodatabase based on chosen watershed
+
+stations = ''
+elev_tiff = ''
+dem = ''
+view_factor = ''
+db = ''
+
+if sWatershed == "Johnston Draw":
+    arcpy.AddMessage("Johnston Draw Watershed")
+    stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD'
+    elev_tiff = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
+    dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_JD'
+    view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD' 
+    db = 'jd_data'
+
+elif sWatershed == "Reynolds Creek":
+    arcpy.AddMessage("Reynolds Creed Watershed")
+    stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations'
+    elev_tiff = r'C:\ReynoldsCreek\rc_elevation_filled.tif'
+    dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_South'
+    view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10M_South'
+    db = 'rc_data'
+
 #connect to MySQL database
 try:
   cnx = mysql.connector.connect(user='root', password='',
                                 host='localhost',
-                                database='jd_data',
+                                database=db,
                                 buffered=True)
 except mysql.connector.Error as err:
 
@@ -778,11 +802,11 @@ lsScratchData.append(fcStations_wElevation)
 ##    WFS_feature_type="station_locations", out_path=scratchGDB, out_name="station_locations")
 station_locations = scratchGDB + "/station_locations"
 lsScratchData.append(station_locations)
-arcpy.CopyFeatures_management(r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD', station_locations)
+arcpy.CopyFeatures_management(stations, station_locations)
 extFullFeatures = arcpy.Describe(scratchGDB + "/station_locations").extent
 #station_locations = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\Required_Data.gdb\station_locations'
 
-rc_elevation = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_JD'
+rc_elevation = dem
 arcpy.env.cellSize = rc_elevation
 output_cell_size = arcpy.env.cellSize
 extElevation = arcpy.Describe(rc_elevation).extent
@@ -822,14 +846,24 @@ while dateIncrement < dateTo:
         #Append query results to parameter lists
         for i in range(0,iNumReturn):
             row = cur.fetchone()
-            lsSiteKey.append(row[0])
-            lsDatetime.append(row[1])
-            lsAirTemperature.append(row[8])
-            lsVaporPressure.append(row[10])
-            lsDewpoint.append(row[11])
-            lsSolarRadiation.append(row[12])
-            lsWindSpeed.append(row[13])
-            lsWindDirection.append(row[14])
+            if sWatershed == "Johnston Draw":
+                lsSiteKey.append(row[0])
+                lsDatetime.append(row[1])
+                lsAirTemperature.append(row[8])
+                lsVaporPressure.append(row[10])
+                lsDewpoint.append(row[11])
+                lsSolarRadiation.append(row[12])
+                lsWindSpeed.append(row[13])
+                lsWindDirection.append(row[14])
+            elif sWatershed == "Reynolds Creek":
+                lsSiteKey.append(row[0])
+                lsDatetime.append(row[1])
+                lsAirTemperature.append(row[9])
+                lsVaporPressure.append(row[11])
+                lsDewpoint.append(row[12])
+                lsSolarRadiation.append(row[13])
+                lsWindSpeed.append(row[14])
+                lsWindDirection.append(row[15])
         cur.close()
 
         #Build climate table to pass to gridding tools
@@ -873,7 +907,7 @@ while dateIncrement < dateTo:
             pathVaporPressure = vaporPressure()
             lsOutput.append(pathVaporPressure)
         if boolWindSpeed:
-            pathWindSpeed = windSpeed(sFrom)
+            pathWindSpeed = windSpeed(sFrom, elev_tiff)
             lsOutput.append(pathWindSpeed)
         if boolSolarRadiation:
             pathSolarRadiation = solarRadiation()
@@ -887,7 +921,7 @@ while dateIncrement < dateTo:
             dRefTemp = cur2.fetchone()[0]
             cur2.close()
 
-            pathThermalRadiation = thermalRadiation(pathAirTemperature, pathVaporPressure, dRefTemp)
+            pathThermalRadiation = thermalRadiation(pathAirTemperature, pathVaporPressure, dRefTemp, view_factor)
 
             lsOutput.append(pathThermalRadiation)
 
@@ -1029,7 +1063,7 @@ if any([boolAllTools, boolSnowDepth]):
     for i in range(0,iNumReturn):
         row = cur.fetchone()
         lsSiteKey.append(row[0])
-        lsSnowDepth.append(row[8])
+        lsSnowDepth.append(row[-1]) # zs is usually the last column 
     cur.close()
 
     #Build snow depth table to pass to gridding tools
@@ -1083,6 +1117,6 @@ shutil.make_archive(outFolder,'zip',outFolder)
 
 
 #Set output parameter as list of output
-arcpy.SetParameterAsText(21, outFolder + ".zip")
+arcpy.SetParameterAsText(22, outFolder + ".zip")
 
 
