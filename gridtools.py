@@ -51,7 +51,7 @@ arcpy.AddMessage("Scratch Workspace: " + scratchWS)
 #scratchWS = r'C:\AA_Thesis_Project\ZZ_MySQL_Work\scratch'
 #Make output folder to zip
 dateNow = datetime.datetime.now()
-sNow = dateNow.strftime("%Y%d%b_%H%M")
+sNow = dateNow.strftime("%Y%d%b_%H%M%S")
 os.makedirs(scratchWS + "/Output_" + sNow)
 outFolder = scratchWS + "/Output_" + sNow
 arcpy.AddMessage("Output Folder: " + outFolder)
@@ -69,6 +69,7 @@ def roundTime(dt, roundTo=60):
     return dt + datetime.timedelta(0,rounding-seconds,-dt.microsecond)
 
 def airTemperature():
+    """ Kriging """
     arcpy.AddMessage("Calculating Air Temperature")
     #Caclulate average air temperatures over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "airTemperature_Table", "air_temperature > -500")
@@ -135,6 +136,7 @@ def constants():
     return outFolder + "/roughness_length_" + sTimeStamp + ".tif", outFolder + "/H2O_saturation_" + sTimeStamp + ".tif"
 
 def dewPoint():
+    """ Kriging """
     arcpy.AddMessage("Calculating Dew Point") 
     #Caclulate average dew point temperature values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "dewPoint_Table", "dewpoint_temperature > -500")
@@ -208,6 +210,7 @@ def dewPoint():
     return outFolder + "/dew_point_temperature_" + sTimeStamp + ".tif", outFolder + "/percent_snow_" + sTimeStamp + ".tif", outFolder + "/precipitation_snow_density_" + sTimeStamp + ".tif"
 
 def precipMass():
+    """ Kriging """
     arcpy.AddMessage("Calculating Precipitation Mass") 
     #Caclulate average precipitation values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/precipitation_table1", "precipitation_Table", "ppts > -500")
@@ -259,6 +262,7 @@ def precipMass():
     return outFolder + "/precipitation_mass_" + sTimeStamp + ".tif"
 
 def snowDepth():
+    """ Kriging """
     arcpy.AddMessage("Calculating Snow Depth") 
     #Caclulate average snow depth values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/snowDepth_table1", "snowDepth_Table", "snow_depth > -500")
@@ -588,6 +592,7 @@ def thermalRadiation(inAirTemperature, inVaporPressure, inSurfaceTemp, v_factor)
     return outFolder + "/thermal_radiation_" + sTimeStamp + ".tif"
 
 def vaporPressure():
+    """ Kriging """
     arcpy.AddMessage("Calculating Vapor Pressure") 
     #Caclulate average vapor pressure values over the n-hour time step (ignore "no-data" values: -999)
     arcpy.MakeTableView_management(scratchGDB + "/climate_table1", "vaporPressure_Table", "vapor_pressure > -500")
@@ -684,31 +689,31 @@ def windSpeed(inDateTime, elevation):
 
     #List arguments for WindNinja CLI
     args = []
-##    args = [ninjaPath,
-##    "--initialization_method", "pointInitialization",
-##    "--elevation_file", elev_file, #elevation raster (cannot contain any "no-data" values)
-##    "--match_points", "false", #match simulations to points (simulation fails if set to true)
-##    "--year", sWindYear,
-##    "--month", sWindMonth,
-##    "--day", sWindDay,
-##    "--hour", sWindHour,
-##    "--minute", sWindMinute,
-##    "--mesh_resolution", output_cell_size, #Resolution of model calculations
-##    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
-##    "--time_zone", "America/Boise", #time zone of target simulation
-##    "--diurnal_winds", "true", #consider diurnal cycles in calculations
-##    "--write_goog_output", "false", #write kml output (boolean: true/false)
-##    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
-##    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
-##    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
-##    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
-##    "--units_ascii_out_resolution", "m",
-##    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
-##    "--units_output_wind_height", "m", #units of output wind height
-##    "--output_speed_units", "mps",
-##    "--output_wind_height", "3",
-##    "--wx_station_filename", scratchWS + "/wnStations.csv", #weather station csv file used in point initialization method
-##    "--output_path", scratchWS] #path to output
+    ##    args = [ninjaPath,
+    ##    "--initialization_method", "pointInitialization",
+    ##    "--elevation_file", elev_file, #elevation raster (cannot contain any "no-data" values)
+    ##    "--match_points", "false", #match simulations to points (simulation fails if set to true)
+    ##    "--year", sWindYear,
+    ##    "--month", sWindMonth,
+    ##    "--day", sWindDay,
+    ##    "--hour", sWindHour,
+    ##    "--minute", sWindMinute,
+    ##    "--mesh_resolution", output_cell_size, #Resolution of model calculations
+    ##    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
+    ##    "--time_zone", "America/Boise", #time zone of target simulation
+    ##    "--diurnal_winds", "true", #consider diurnal cycles in calculations
+    ##    "--write_goog_output", "false", #write kml output (boolean: true/false)
+    ##    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
+    ##    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
+    ##    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
+    ##    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
+    ##    "--units_ascii_out_resolution", "m",
+    ##    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
+    ##    "--units_output_wind_height", "m", #units of output wind height
+    ##    "--output_speed_units", "mps",
+    ##    "--output_wind_height", "3",
+    ##    "--wx_station_filename", scratchWS + "/wnStations.csv", #weather station csv file used in point initialization method
+    ##    "--output_path", scratchWS] #path to output
 
     #run the WindNinja_cli.exe (output is written to same location as elevation raster)
     arcpy.AddMessage("Calling WindNinja command line interface")
