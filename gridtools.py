@@ -256,7 +256,14 @@ def precipMass():
     else:
         #Run ordinary least squares on tempStations
         arcpy.CreateTable_management(scratchGDB, "coef_table")
-        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_ppts","RASTERVALU", scratchGDB + "/coef_table","","")
+        try:
+            ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_ppts","RASTERVALU", scratchGDB + "/coef_table","","")
+        except arcpy.ExecuteError:
+            msgs = arcpy.GetMessages(2)
+            #arcpy.AddMessage(msgs)
+            if 'Zero variance' in msgs:
+                arcpy.AddMessage("No precipitation")
+            return
         lsScratchData_Imd.append(scratchGDB + "/coef_table")
         intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
         slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
