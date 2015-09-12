@@ -915,8 +915,15 @@ while dateIncrement < dateTo:
             pathWindSpeed = windSpeed(sFrom, elev_tiff)
             lsOutput.append(pathWindSpeed)
         if boolSolarRadiation:
-            pathSolarRadiation = solarRadiation()
-            lsOutput.append(pathSolarRadiation)
+            try:
+                pathSolarRadiation = solarRadiation()
+                lsOutput.append(pathSolarRadiation)
+            except arcpy.ExecuteError:
+                msgs = arcpy.GetMessages(2)
+                #arcpy.AddMessage(msgs)
+                if 'Failed to open raster dataset' in msgs:
+                    arcpy.AddMessage("Skip night hours")        
+        
         if boolThermalRadiation:
             #Query database for average air temperature for current day
             sFromTR = dateIncrement.strftime("%Y-%m-%d")
