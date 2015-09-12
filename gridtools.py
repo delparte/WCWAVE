@@ -256,6 +256,7 @@ def precipMass():
     else:
         #Run ordinary least squares on tempStations
         arcpy.CreateTable_management(scratchGDB, "coef_table")
+        #Check if there was precipitation - I would like to change this check to occur before trying to run OLS
         try:
             ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_ppts","RASTERVALU", scratchGDB + "/coef_table","","")
         except arcpy.ExecuteError:
