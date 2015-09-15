@@ -202,28 +202,26 @@ def download_output(id):
 #    for url in out_json['value']:
 #        download(url['url'])
 
-def end_2_end(start_date, end_date, time_step=1):
+def end_2_end(start_date, end_date, time_step=3):
     """
     Run all working tools from submitJob to download_output.
 
     Currently only runs for tools that work.
     """
     job = submit_job(start_date, end_date, time_step, kriging_method="Empirical Bayesian",
-                air_temperature="true", constants="true", dew_point_temperature="false",
-                precipitation_mass="false", snow_depth="false", snow_properties="true",
-                soil_temperature="true", solar_radiation="false", thermal_radiation="true",
+                air_temperature="true", constants="true", dew_point_temperature="true",
+                precipitation_mass="true", snow_depth="true", snow_properties="true",
+                soil_temperature="true", solar_radiation="true", thermal_radiation="true",
                 vapor_pressure="true", wind_speed="true")
+    print('Job ID: ' + job)
     watch_status(job, sl=30)
     print_messages(job)
     download_output(job)
+    path = os.getcwd()
+    print("Downloaded to " + path)
     print("Job Complete")
 
 
 if __name__ == '__main__':
-    new_job = submit_job(from_date=u'1986-12-02 18:00:00',
-                         to_date=u'1986-12-02 19:00:00',
-                         air_temperature='true')
-    watch_status(new_job)
-    print_json(new_job)
-
+    end_2_end('2014-01-01 12:00:00', '2014-01-01 15:00:00')
 #r = requests.get(url)
