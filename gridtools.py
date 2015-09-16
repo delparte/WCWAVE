@@ -52,8 +52,8 @@ arcpy.AddMessage("Scratch Workspace: " + scratchWS)
 #Make output folder to zip
 dateNow = datetime.datetime.now()
 sNow = dateNow.strftime("%Y%d%b_%H%M%S")
-os.makedirs(scratchWS + "/Output")
-outFolder = scratchWS + "/Output"
+os.makedirs(scratchWS + "/Output_" + sNow)
+outFolder = scratchWS + "/Output_" + sNow
 arcpy.AddMessage("Output Folder: " + outFolder)
 scratchGDB = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
@@ -858,18 +858,18 @@ iNumSteps = iHours / iTimeStep
 
 #Initialize all Relevant Data from the Geodatabase based on chosen watershed
 
-stations = ''
-elev_tiff = ''
-dem = ''
-view_factor = ''
+stations = '' # Feature class of station meta data/locations
+elev_tiff = '' # Needed for wind speed
+dem = '' # Needed for almost all
+view_factor = '' # Needed for Thermal radiation
 db = ''
 
 if sWatershed == "Johnston Draw":
     arcpy.AddMessage("Johnston Draw Watershed")
     stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD'
     elev_tiff = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
-    dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_JD'
-    view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10m_South_JD' 
+    dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\JD_DEM_10m'
+    view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\JD_ViewFactor_10m' 
     db = 'jd_data'
 
 elif sWatershed == "Reynolds Creek":
