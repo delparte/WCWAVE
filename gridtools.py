@@ -381,9 +381,7 @@ def snowDepth():
     del cursor
     del row
     average = numpy.mean(values) 
-    arcpy.AddMessage('List of values ' + str(values) + 'Average ' + str(average))
     count = int(arcpy.GetCount_management(scratchGDB + '/tempStations').getOutput(0))
-    arcpy.AddMessage('Row count ' + str(count))
     if count >= 10 and average > 0: 
         #Check if interpolation method is Empirical Bayesian or Detrended
         if sKrigMethod == "Detrended":
@@ -745,7 +743,7 @@ def vaporPressure():
     #Add back elevation trends and save final raster
     output_raster = arcpy.Raster(scratchGDB + "/vaporPressure_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
     output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
-
+    
     return outFolder + "/vapor_pressure_" + sTimeStamp + ".tif"
 
 def windSpeed(inDateTime, elevation):
