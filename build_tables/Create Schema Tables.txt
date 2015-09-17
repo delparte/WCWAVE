@@ -1,0 +1,60 @@
+CREATE TABLE `weather` (
+  `Site_Key` varchar(15) NOT NULL,
+  `date_time` datetime NOT NULL,
+  `wy` smallint(4) unsigned NOT NULL,
+  `year` smallint(4) unsigned NOT NULL,
+  `month` smallint(2) unsigned NOT NULL,
+  `day` smallint(2) unsigned NOT NULL,
+  `hour` smallint(2) unsigned NOT NULL,
+  `minute` smallint(2) unsigned NOT NULL,
+  `ta` double(5,2) NOT NULL DEFAULT '-999.00',
+  `rh` double(5,2) NOT NULL DEFAULT '-999.00',
+  `ea` double(6,1) NOT NULL DEFAULT '-999.0',
+  `td` double(5,2) NOT NULL DEFAULT '-999.00',
+  `si` double(6,1) NOT NULL DEFAULT '-999.0',
+  `ws` double(6,2) NOT NULL DEFAULT '-999.00',
+  `wd` double(6,1) NOT NULL DEFAULT '-999.0',
+  PRIMARY KEY (`Site_Key`,`date_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+
+CREATE TABLE `snow_depth` (
+  `Site_Key` varchar(15) NOT NULL,
+  `date_time` datetime NOT NULL,
+  `WY` smallint(4) unsigned NOT NULL,
+  `Year` smallint(4) unsigned NOT NULL,
+  `Month` smallint(2) unsigned NOT NULL,
+  `Day` smallint(2) unsigned NOT NULL,
+  `Hour` smallint(2) unsigned NOT NULL,
+  `Minute` smallint(2) unsigned NOT NULL,
+  `zs` double(5,2) NOT NULL DEFAULT '-999.00',
+  PRIMARY KEY (`Site_Key`,`date_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+
+CREATE TABLE `precipitation` (
+  `Site_Key` varchar(15) NOT NULL,
+  `date_time` datetime NOT NULL,
+  `ppts` double(5,2) NOT NULL DEFAULT '-999.00',
+  `pptu` double(5,2) NOT NULL DEFAULT '-999.00',
+  `ppta` double(5,2) NOT NULL DEFAULT '-999.00',
+  PRIMARY KEY (`Site_Key`,`date_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+
+CREATE TABLE `soil_temperature` (
+  `Site_Key` varchar(15) NOT NULL,
+  `date_time` datetime NOT NULL,
+  `stm002_5` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm005` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm010` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm015` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm020` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm030` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm040` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm050` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm055` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm060` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm070` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm090` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm120` double(5,2) NOT NULL DEFAULT '-999.00',
+  `stm180` double(5,2) NOT NULL DEFAULT '-999.00',
+  PRIMARY KEY (`Site_Key`,`date_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
