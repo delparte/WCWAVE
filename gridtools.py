@@ -115,8 +115,12 @@ def airTemperature():
             overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
             output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
         lsScratchData_Imd.append(scratchGDB + "/airTemperature_residual")
+        
+        outExtractByMask = ExtractByMask(scratchGDB + '/airTemperature_residual', rc_elevation)
+        outExtractByMask.save(scratchGDB + '/airTemperature_scratch')
+        lsScratchData_Imd.append(scratchGDB + '/airTemperature_scratch')
 
-        output_raster = arcpy.Raster(scratchGDB + "/airTemperature_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+        output_raster = arcpy.Raster(scratchGDB + "/airTemperature_scratch") + (arcpy.Raster(rc_elevation) * slope + intercept)
         output_raster.save(outFolder + "/air_temperature_" + sTimeStamp + ".tif")
     #Check if interpolation method is Empirical Bayesian or Detrended
     elif sKrigMethod == "Detrended":
