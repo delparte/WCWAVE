@@ -392,8 +392,13 @@ def precipMass():
                 search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
                 output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", \
                 semivariogram_model_type="THIN_PLATE_SPLINE")
+
+            outExtractByMask = ExtractByMask(scratchGDB + '/precipitation_residual', rc_elevation)
+            outExtractByMask.save(scratchGDB + '/precipitation_scratch')
+            lsScratchData_Imd.append(scratchGDB + '/precipitation_residual')
+            lsScratchData_Imd.append(scratchGDB + '/precipitation_scratch')
             #Add back elevation trends and save final raster
-            output_raster = arcpy.Raster(scratchGDB + "/precipitation_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+            output_raster = arcpy.Raster(scratchGDB + "/precipitation_scratch") + (arcpy.Raster(rc_elevation) * slope + intercept)
             output_raster.save(outFolder + "/precipitation_mass_" + sTimeStamp + ".tif")
         else:
             arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_ppts", out_ga_layer="#", \
@@ -403,6 +408,11 @@ def precipMass():
                 output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", \
                 semivariogram_model_type="WHITTLE_DETRENDED")
 
+            # Mask the output of EBK to size of input grid
+            arcpy.AddMessage("Masking")
+            outExtractByMask = ExtractByMask(outFolder + '/precipitation_mass_scratch_' + sTimeStamp + '.tif', rc_elevation)
+            outExtractByMask.save(outFolder + '/precipitation_mass_' + sTimeStamp + '.tif')
+            lsScratchData_Imd.append(outFolder + "/precipitation_mass_scratch_" + sTimeStamp + ".tif")
     
     return outFolder + "/precipitation_mass_" + sTimeStamp + ".tif"
 
