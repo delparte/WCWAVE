@@ -781,32 +781,65 @@ def vaporPressure():
             cursor.deleteRow(row)
     del cursor
     del row
-
-    #Add unique ID field to tempStations for use in OLS function
-    arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
-    #Run ordinary least squares on tempStations
-    arcpy.CreateTable_management(scratchGDB, "coef_table")
-    ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_vapor_pressure","RASTERVALU", scratchGDB + "/coef_table","","")
-    lsScratchData_Imd.append(scratchGDB + "/coef_table")
-    intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
-    slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
-    #Calculate residuals and add them to tempStations
-    arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
-    cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
-    for row in cursor:
-        row.setValue("residual", row.getValue("MEAN_vapor_pressure") - ((slope * row.getValue("RASTERVALU")) + intercept))
-        cursor.updateRow(row)
-    del cursor
-    arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
-        out_raster=scratchGDB + "/vaporPressure_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
-        overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
-        output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
-    lsScratchData_Imd.append(scratchGDB + "/vaporPressure_residual")
-    #Add back elevation trends and save final raster
-    output_raster = arcpy.Raster(scratchGDB + "/vaporPressure_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
-    output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
     
+    if sKrigMethod == "Combined":
+        #Add unique ID field to tempStations for use in OLS function
+        arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
+        #Run ordinary least squares on tempStations
+        arcpy.CreateTable_management(scratchGDB, "coef_table")
+        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_vapor_pressure","RASTERVALU", scratchGDB + "/coef_table","","")
+        lsScratchData_Imd.append(scratchGDB + "/coef_table")
+        intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
+        slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
+        #Calculate residuals and add them to tempStations
+        arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
+        for row in cursor:
+            row.setValue("residual", row.getValue("MEAN_vapor_pressure") - ((slope * row.getValue("RASTERVALU")) + intercept))
+            cursor.updateRow(row)
+        del cursor
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
+            out_raster=scratchGDB + "/vaporPressure_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
+            overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
+            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
+        lsScratchData_Imd.append(scratchGDB + "/vaporPressure_residual")
+        #Add back elevation trends and save final raster
+        output_raster = arcpy.Raster(scratchGDB + "/vaporPressure_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+        output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
+    elif sKrigMethod == "Detrended":
+        #Add unique ID field to tempStations for use in OLS function
+        arcpy.AddField_management(scratchGDB +"/tempStations", "Unique_ID", "SHORT", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        arcpy.CalculateField_management(scratchGDB +"/tempStations","Unique_ID","!OBJECTID!","PYTHON_9.3","")
+        #Run ordinary least squares on tempStations
+        arcpy.CreateTable_management(scratchGDB, "coef_table")
+        ols = arcpy.OrdinaryLeastSquares_stats(scratchGDB + "/tempStations","Unique_ID","in_memory/fcResid","MEAN_vapor_pressure","RASTERVALU", scratchGDB + "/coef_table","","")
+        lsScratchData_Imd.append(scratchGDB + "/coef_table")
+        intercept = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[0]
+        slope = list((row.getValue("Coef") for row in arcpy.SearchCursor(scratchGDB + "/coef_table",fields="Coef")))[1]
+        #Calculate residuals and add them to tempStations
+        arcpy.AddField_management(scratchGDB + "/tempStations", "residual", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED", "")
+        cursor = arcpy.UpdateCursor(scratchGDB + "/tempStations")
+        for row in cursor:
+            row.setValue("residual", row.getValue("MEAN_vapor_pressure") - ((slope * row.getValue("RASTERVALU")) + intercept))
+            cursor.updateRow(row)
+        del cursor
+        del row
+        #Run ordinary kriging on residuals
+        #arcpy.gp.Kriging_sa(scratchGDB + "/tempStations", "residual", scratchGDB + "/vaporPressure_residual", "Linear 37.061494", output_cell_size, "VARIABLE 100", "")
+        outKrig = Kriging(scratchGDB + "/tempStations", "residual", KrigingModelOrdinary("SPHERICAL", 460, 3686, .1214, .2192), output_cell_size, RadiusFixed(10000, 1))
+        outKrig.save(scratchGDB + "/vaporPressure_residual")
+        lsScratchData_Imd.append(scratchGDB + "/vaporPressure_residual")
+        #Add back elevation trends and save final raster
+        output_raster = arcpy.Raster(scratchGDB + "/vaporPressure_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
+        output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
+    else:
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_vapor_pressure",\
+                out_ga_layer="#", out_raster=outFolder + "/vapor_pressure_" + sTimeStamp + ".tif", cell_size=output_cell_size,\
+                transformation_type="EMPIRICAL", max_local_points="100", overlap_factor="1", number_semivariograms="100",\
+                search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", output_type="PREDICTION",\
+                quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
+
     return outFolder + "/vapor_pressure_" + sTimeStamp + ".tif"
 
 def windSpeed(inDateTime, elevation):
