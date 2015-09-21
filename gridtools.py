@@ -800,10 +800,18 @@ def vaporPressure():
             cursor.updateRow(row)
         del cursor
         arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="residual", out_ga_layer="#", \
-            out_raster=scratchGDB + "/vaporPressure_residual", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
+            out_raster=scratchGDB + "/vaporPressure_scratch", cell_size=output_cell_size, transformation_type="NONE", max_local_points="100", \
             overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
             output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="THIN_PLATE_SPLINE")
+        lsScratchData_Imd.append(scratchGDB + "/vaporPressure_scratch")
+
+        # Mask the output of EBK to size of input grid
+        arcpy.AddMessage("Masking")
+        outExtractByMask = ExtractByMask(scratchGDB + '/vaporPressure_scratch', rc_elevation)
+        outExtractByMask.save(scratchGDB + '/vaporPressure_residual')
+
         lsScratchData_Imd.append(scratchGDB + "/vaporPressure_residual")
+        
         #Add back elevation trends and save final raster
         output_raster = arcpy.Raster(scratchGDB + "/vaporPressure_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
         output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
@@ -835,11 +843,17 @@ def vaporPressure():
         output_raster.save(outFolder + "/vapor_pressure_" + sTimeStamp + ".tif")
     else:
         arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_vapor_pressure",\
-                out_ga_layer="#", out_raster=outFolder + "/vapor_pressure_" + sTimeStamp + ".tif", cell_size=output_cell_size,\
+                out_ga_layer="#", out_raster=outFolder + "/vapor_pressure_scratch_" + sTimeStamp + ".tif", cell_size=output_cell_size,\
                 transformation_type="EMPIRICAL", max_local_points="100", overlap_factor="1", number_semivariograms="100",\
                 search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", output_type="PREDICTION",\
                 quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
 
+        # Mask the output of EBK to size of input grid
+        arcpy.AddMessage("Masking")
+        outExtractByMask = ExtractByMask(outFolder + '/vapor_pressure_scratch_' + sTimeStamp + '.tif', rc_elevation)
+        outExtractByMask.save(outFolder + '/vapor_pressure_' + sTimeStamp + '.tif')
+        lsScratchData_Imd.append(outFolder + "/vapor_pressure_scratch_" + sTimeStamp + ".tif")
+        
     return outFolder + "/vapor_pressure_" + sTimeStamp + ".tif"
 
 def windSpeed(inDateTime, elevation):
