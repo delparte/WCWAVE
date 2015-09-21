@@ -942,6 +942,12 @@ def windSpeed(inDateTime, elevation):
     for file in os.listdir(scratchWS):
         if file.endswith("_vel.asc"):
             path2ASCII = scratchWS + "/" + file
+            lsScratchData_Imd.append(path2ASCII)
+        elif ( file.endswith("_vel.prj") or file.endswith('_ang.asc') or
+               file.endswith('_ang.prj') or file.endswith('cld.asc') or 
+               file.endswith('_cld.prj') ):
+            lsScratchData_Imd.append(scratchWS + '/' + file)
+    arcpy.AddMessage(lsScratchData_Imd)
     arcpy.ASCIIToRaster_conversion(in_ascii_file=path2ASCII, out_raster=outFolder + "/wind_speed_" + sTimeStamp + ".tif", data_type="FLOAT")
 
     #Get coordinate system information
