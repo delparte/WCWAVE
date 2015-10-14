@@ -39,11 +39,11 @@ import subprocess
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
     'bool_air_temperature': True, 
     'bool_vapor_pressure': False, 
-    'to_date': u'2014-01-01 13:00:00', 
+    'to_date': u'2008-01-01 13:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
-    'from_date': u'2014-01-01 12:00:00', 
+    'from_date': u'2008-01-01 12:00:00', 
     'bool_solar_radiation': False, 
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
@@ -55,7 +55,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_thermal_radiation': False, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
-    'watershed': u'Johnston Draw', 
+    'watershed': u'Reynolds Creek', 
     'bool_snow_depth': False, 
     'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
     }
@@ -153,7 +153,43 @@ def ParameterList(param_dict, rows):
             param_dict['wind_direction'].append(row[15])
     return param_dict
 
+def BuildClimateTable(params, num):
+    arcpy.management.CreateTable(data['scratch_gdb'], 'climate_table')
+    table = data['scratch_gdb'] + '/climate_table'
+    keys = [] # Holds data types collected (wind speed, air temperature, etc) to add to table
+    for key in params:
+        if key == 'site_key':
+            ftype = "TEXT"
+        elif key == 'date_time':
+            ftype = "DATE"
+        else:
+            ftype = "FLOAT"
+        arcpy.management.AddField(in_table = table,
+            field_name = key,
+            field_type = ftype)
+        keys.append(key)
+    in_cursor = arcpy.InsertCursor(table)
+    # Sorry about this thing.  I meant it to be able to scale according to the
+    # type of data colelcted (ie. to make it simple to add different data to the
+    # list.  
+    for j in range(0, num):
+        row = in_cursor.newRow()
+        for k in range(0, len(keys)):
+            # ---Explained---
+            # keys[x] = site_key, air_temperature, etc.
+            # params[keys[k][j] = value (ie -2.5)
+            row.setValue(keys[k], params[keys[k]][j])
+        in_cursor.insertRow(row)
+    del in_cursor
+    del row
+    return table
+
+def DeleteScratchData(in_list):
+    for path in in_list:
+        arcpy.management.Delete(path)
+
 # Main Function --- Figure out a way to be run as script or as tool
+#======================================================================
 if __name__ == '__main__':
     #Checkout needed Extentions
     arcpy.CheckOutExtension('Spatial')
@@ -182,7 +218,7 @@ if __name__ == '__main__':
     ls_scratch_data.append(data['fc_stations_elev'])
     data.update({'station_locations' : data['scratch_gdb'] + '/station_locations'})
     arcpy.management.CopyFeatures(data['stations'], data['station_locations'])
-
+    ls_scratch_data.append(data['station_locations'])
     data['ext_features'] = arcpy.Describe(data['station_locations']).extent
     
     arcpy.env.cellSize = data['dem']
@@ -231,8 +267,19 @@ if __name__ == '__main__':
             i_num_return = cur.rowcount
             print('Query: ' + query)
             print('Row Count: ' + str(i_num_return))
+            #Build parameter lists into dictionary
             parameters = ParameterList(parameters, cur)
-            print('Climate table')
+            cur.close()
+            
+            # Build Climate table
+            climate_table = BuildClimateTable(parameters, i_num_return)
+            ls_scratch_data_imd.append(climate_table)
+            # Run interpolation tools
+            if data['bool_air_temperature']:
+                print('Air Temperature')
+            
+            DeleteScratchData(ls_scratch_data_imd)
         
         
         date_increment += delta
+    DeleteScratchData(ls_scratch_data)
