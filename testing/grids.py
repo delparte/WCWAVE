@@ -184,13 +184,63 @@ def BuildClimateTable(params, num):
     del row
     return table
 
+def DataTable(parameter, data_table):
+    ''' Create paramater scratch table to be used for interpolation '''
+    scratch_data = []
+    temp_table1 = parameter + '_table'
+    out = arcpy.management.MakeTableView(in_table = data_table,
+            out_view = temp_table1,
+            where_clause = parameter + ' > -500')
+    temp_table2 = 'in_memory/' + parameter + '_table2'
+    scratch_data.append(temp_table1)
+    out_mem = arcpy.analysis.Statistics(in_table = temp_table1,
+            out_table = temp_table2,
+            statistics_fields = parameter + ' MEAN',
+            case_field = 'site_key')
+    # Copy stats to tempStations feature class
+    temp_stations = arcpy.management.CopyFeatures(in_features = data['fc_stations_elev'],
+            out_feature_class = data['scratch_gdb'] + '/tempStations')
+    # Join stats to temp stations feature class
+    arcpy.management.JoinField(in_data = temp_stations, 
+            in_field = 'Site_Key',
+            join_table = temp_table2,
+            join_field = 'site_key',
+            fields = 'MEAN_' + parameter)
+    
+    # Delete rows from feature class that have negative or null elevations
+    cursor = arcpy.UpdateCursor(temp_stations)
+    for row in cursor:
+        if (row.getValue('RASTERVALU') < 0 or
+                row.getValue('RASTERVALU') == 'None' or
+                row.getValue('RASTERVALU') is None ):
+            cursor.deleteRow(row)
+    del cursor
+    del row
+    # Delete rows from feature class that have null values for paramter
+    cursor = arcpy.UpdateCursor(temp_stations)
+    for row in cursor:
+        if row.isNull('MEAN_' + parameter):
+            cursor.deleteRow(row)
+    del cursor
+    del row
+    DeleteScratchData(scratch_data)
+    return temp_stations
+
+def AirTemperature(clim_tab):
+    print('Air Temperature')
+    scratch_table = DataTable('air_temperature', clim_tab)
+    #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp')
+    
+    #Delete tempStations when done.
+    arcpy.management.Delete(scratch_table)
+
+
 def DeleteScratchData(in_list):
     for path in in_list:
         arcpy.management.Delete(path)
+    arcpy.management.Delete('in_memory')
 
-# Main Function --- Figure out a way to be run as script or as tool
-#======================================================================
-if __name__ == '__main__':
+def main():
     #Checkout needed Extentions
     arcpy.CheckOutExtension('Spatial')
     
@@ -276,10 +326,14 @@ if __name__ == '__main__':
             ls_scratch_data_imd.append(climate_table)
             # Run interpolation tools
             if data['bool_air_temperature']:
-                print('Air Temperature')
-            
+                path_air_temp = AirTemperature(climate_table)    
             DeleteScratchData(ls_scratch_data_imd)
         
         
         date_increment += delta
     DeleteScratchData(ls_scratch_data)
+
+# Main Function --- Figure out a way to be run as script or as tool
+#======================================================================
+if __name__ == '__main__':
+    main() 
