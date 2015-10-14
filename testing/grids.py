@@ -64,7 +64,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
 scratchWS = arcpy.env.scratchFolder
 arcpy.env.workspace = scratchWS
 arcpy.env.scratchWorkspace = scratchWS
-arcpy.AddMessage("Scratch Workspace: " + scratchWS)
+arcpy.AddMessage('Scratch Workspace: ' + scratchWS)
 scratchGDB = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
 
@@ -85,23 +85,23 @@ def roundTime(dt, roundTo=60):
     return dt + datetime.timedelta(0,rounding-seconds,-dt.microsecond)
 
 def selectWatershed(watershed):
-    """ Initialize all Relevant Data from the Geodatabase based on chosen watershed """
+    ''' Initialize all Relevant Data from the Geodatabase based on chosen watershed '''
     stations = '' # Feature class of station meta data/locations
     elev_tiff = '' # Needed for wind speed
     dem = '' # Needed for almost all
     view_factor = '' # Needed for Thermal radiation
     db = ''
     
-    if watershed == "Johnston Draw":
-        arcpy.AddMessage("Johnston Draw Watershed")
+    if watershed == 'Johnston Draw':
+        arcpy.AddMessage('Johnston Draw Watershed')
         stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD'
         elev_tiff = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
         dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\JD_DEM_10m'
         view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\JD_ViewFactor_10m' 
         db = 'jd_data'
     
-    elif watershed == "Reynolds Creek":
-        arcpy.AddMessage("Reynolds Creek Watershed")
+    elif watershed == 'Reynolds Creek':
+        arcpy.AddMessage('Reynolds Creek Watershed')
         stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations'
         elev_tiff = r'C:\ReynoldsCreek\rc_elevation_filled.tif'
         dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_South'
@@ -110,7 +110,7 @@ def selectWatershed(watershed):
     return stations, elev_tiff, dem, view_factor, db
 
 def ConnectDB(db):
-    """connect to MySQL database"""
+    '''connect to MySQL database'''
     try:
       cnx = mysql.connector.connect(user='root', password='',
                                     host='localhost',
@@ -119,13 +119,13 @@ def ConnectDB(db):
     except mysql.connector.Error as err:
 
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            arcpy.AddMessage("Something is wrong with your user name or password")
+            arcpy.AddMessage('Something is wrong with your user name or password')
         elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            arcpy.AddMessage("Database does not exist")
+            arcpy.AddMessage('Database does not exist')
         else:
             arcpy.AddMessage(err)
     else:
-        arcpy.AddMessage("Connection successful")
+        arcpy.AddMessage('Connection successful')
     return cnx
 
 def ParameterList(param_dict, rows):
@@ -133,7 +133,7 @@ def ParameterList(param_dict, rows):
     count = rows.rowcount
     for i in range(0, count):
         row = rows.fetchone()
-        if data['watershed'] == "Johnston Draw":
+        if data['watershed'] == 'Johnston Draw':
             param_dict['site_key'].append(row[0])
             param_dict['date_time'].append(row[1])
             param_dict['air_temperature'].append(row[8])
@@ -142,7 +142,7 @@ def ParameterList(param_dict, rows):
             param_dict['solar_radiation'].append(row[12])
             param_dict['wind_speed'].append(row[13])
             param_dict['wind_direction'].append(row[14])
-        elif data['watershed'] == "Reynolds Creek":
+        elif data['watershed'] == 'Reynolds Creek':
             param_dict['site_key'].append(row[0])
             param_dict['date_time'].append(row[1])
             param_dict['air_temperature'].append(row[9])
@@ -159,11 +159,11 @@ def BuildClimateTable(params, num):
     keys = [] # Holds data types collected (wind speed, air temperature, etc) to add to table
     for key in params:
         if key == 'site_key':
-            ftype = "TEXT"
+            ftype = 'TEXT'
         elif key == 'date_time':
-            ftype = "DATE"
+            ftype = 'DATE'
         else:
-            ftype = "FLOAT"
+            ftype = 'FLOAT'
         arcpy.management.AddField(in_table = table,
             field_name = key,
             field_type = ftype)
