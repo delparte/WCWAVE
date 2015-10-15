@@ -39,11 +39,11 @@ import subprocess
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
     'bool_air_temperature': True, 
     'bool_vapor_pressure': False, 
-    'to_date': u'2008-01-01 13:00:00', 
+    'to_date': u'2014-01-01 13:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
-    'from_date': u'2008-01-01 12:00:00', 
+    'from_date': u'2014-01-01 12:00:00', 
     'bool_solar_radiation': False, 
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
@@ -55,7 +55,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_thermal_radiation': False, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
-    'watershed': u'Reynolds Creek', 
+    'watershed': u'Johnston Draw', 
     'bool_snow_depth': False, 
     'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
     }
@@ -112,10 +112,11 @@ def selectWatershed(watershed):
 def ConnectDB(db):
     '''connect to MySQL database'''
     try:
-      cnx = mysql.connector.connect(user='root', password='',
+        cnx = mysql.connector.connect(user='root', password='',
                                     host='localhost',
                                     database=db,
                                     buffered=True)
+        return cnx
     except mysql.connector.Error as err:
 
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -126,7 +127,6 @@ def ConnectDB(db):
             arcpy.AddMessage(err)
     else:
         arcpy.AddMessage('Connection successful')
-    return cnx
 
 def ParameterList(param_dict, rows):
     '''Append all data to the end of the parameter list'''
