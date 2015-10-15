@@ -13,6 +13,10 @@ import json
 import shutil
 import subprocess
 
+#Checkout needed Extentions
+arcpy.CheckOutExtension('Spatial')
+arcpy.CheckOutExtension('GeoStats')
+
 ## data = {'watershed' : arcpy.GetParameterAsText(0),
 ##     'from_date' : arcpy.GetParameterAsText(1),
 ##     'to_date' : arcpy.GetParameterAsText(2),
@@ -51,7 +55,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_dew_point': False, 
     'bool_precip_mass': False, 
     'bool_wind_speed': False, 
-    'kriging_method': u'Detrended', 
+    'kriging_method': u'Empirical Bayesian Kriging', 
     'bool_thermal_radiation': False, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
@@ -254,8 +258,7 @@ def DetrendedMethod(parameter, data_table, date_stamp):
             Dependent_Variable = 'MEAN_' + parameter,
             Explanatory_Variables = 'RASTERVALU',
             Coefficient_Output_Table = coef_table)
-    intercept = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[0
-            ]
+    intercept = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[0]
     slope = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[1]
     #Calculate residuals and add them to temporary data table
     arcpy.management.AddField(in_table = data_table,
@@ -265,7 +268,8 @@ def DetrendedMethod(parameter, data_table, date_stamp):
             field_is_required = 'NON_REQUIRED')
     cursor = arcpy.UpdateCursor(data_table)
     for row in cursor:
-        row.setValue('residual', row.getValue('MEAN_' + parameter) - ((slope * row.getValue('RASTERVALU')) + intercept))
+        row_math = row.getValue('MEAN_' + parameter) - ((slope * row.getValue('RASTERVALU')) + intercept)
+        row.setValue('residual', row_math)
         cursor.updateRow(row)
     del cursor
     del row
@@ -287,6 +291,26 @@ def DetrendedMethod(parameter, data_table, date_stamp):
     del radius
     arcpy.management.Delete(resid_raster)
     return return_raster
+
+def EBKMethod(parameter, data_table, date_stamp):
+    print('Empirical Bayesian Kriging')
+    arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
+            z_field = 'MEAN_' + parameter,
+            out_raster = data['scratch_gdb'] + '/' + parameter,
+            cell_size = data['output_cell_size'],
+            transformation_type = 'EMPIRICAL',
+            max_local_points = '100',
+            overlap_factor = '1',
+            number_semivariograms = '100',
+            search_neighborhood = 'NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2',
+            output_type = 'PREDICTION',
+            quantile_value = '0.5',
+            threshold_type = 'EXCEED',
+            semivariogram_model_type='WHITTLE_DETRENDED')
+    outExtract = ExtractByMask(data['scratch_gdb'] + '/' + parameter, data['dem'])
+    outExtract.save(data['out_folder'] + '/' + parameter + '_' + str(date_stamp) + '.tif')
+    arcpy.management.Delete(data['scratch_gdb'] + '/' + parameter)
+    return data['out_folder'] + '/' + parameter + '_' + str(date_stamp) + '.tif'
 
 def AirTemperature(clim_tab, date_stamp):
     print('Air Temperature')
@@ -332,8 +356,6 @@ def DeleteScratchData(in_list):
 # Main Function --- Figure out a way to be run as script or as tool
 #======================================================================
 def main():
-    #Checkout needed Extentions
-    arcpy.CheckOutExtension('Spatial')
     from_date_round = datetime.datetime.strptime(data['from_date'], '%Y-%m-%d %H:%M:%S')
     to_date_round = datetime.datetime.strptime(data['to_date'], '%Y-%m-%d %H:%M:%S')
     data['from_date'] = roundTime(from_date_round, 60*60)
@@ -368,6 +390,7 @@ def main():
     data.update({'output_cell_size' : arcpy.env.cellSize,
         'ext_elev' : arcpy.Describe(data['dem']).extent
         })
+    arcpy.env.extent = data['ext_elev']
     
     arcpy.sa.ExtractValuesToPoints(in_point_features = data['station_locations'],
             in_raster = data['dem'],
