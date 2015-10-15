@@ -214,6 +214,10 @@ def DataTable(parameter, data_table):
                 row.getValue('RASTERVALU') == 'None' or
                 row.getValue('RASTERVALU') is None ):
             cursor.deleteRow(row)
+        else:
+            row.setValue('RASTERVALU', round(row.getValue('RASTERVALU'), 2))
+            cursor.updateRow(row)
+
     del cursor
     del row
     # Delete rows from feature class that have null values for paramter
@@ -221,6 +225,9 @@ def DataTable(parameter, data_table):
     for row in cursor:
         if row.isNull('MEAN_' + parameter):
             cursor.deleteRow(row)
+        else:
+            row.setValue('MEAN_' + parameter, round(row.getValue('MEAN_' + parameter), 2))
+            cursor.updateRow(row)
     del cursor
     del row
     DeleteScratchData(scratch_data)
@@ -229,11 +236,18 @@ def DataTable(parameter, data_table):
 def AirTemperature(clim_tab):
     print('Air Temperature')
     scratch_table = DataTable('air_temperature', clim_tab)
-    #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp')
+    arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
     
     #Delete tempStations when done.
     arcpy.management.Delete(scratch_table)
 
+def DewPoint(clim_tab):
+    print('Dewpoint Temperature')
+    scratch_table = DataTable('dew_point', clim_tab)
+    arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_dp')
+
+    #Delete tempStations when done
+    arcpy.management.Delete(scratch_table)
 
 def DeleteScratchData(in_list):
     for path in in_list:
@@ -326,7 +340,8 @@ def main():
             ls_scratch_data_imd.append(climate_table)
             # Run interpolation tools
             if data['bool_air_temperature']:
-                path_air_temp = AirTemperature(climate_table)    
+                path_air_temp = AirTemperature(climate_table)
+                path_dew_point = DewPoint(climate_table)
             DeleteScratchData(ls_scratch_data_imd)
         
         
