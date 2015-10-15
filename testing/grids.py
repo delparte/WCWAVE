@@ -17,7 +17,7 @@ import subprocess
 ##     'from_date' : arcpy.GetParameterAsText(1),
 ##     'to_date' : arcpy.GetParameterAsText(2),
 ##     'time_step' : int(arcpy.GetParameterAsText(3)),
-##     'kriging_Method' : arcpy.GetParameterAsText(4),
+##     'kriging_method' : arcpy.GetParameterAsText(4),
 ##     'bool_all_tools' : arcpy.GetParameter(5),
 ##     'bool_air_temperature' : arcpy.GetParameter(6),
 ##     'bool_constants' : arcpy.GetParameter(7),
@@ -51,7 +51,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_dew_point': False, 
     'bool_precip_mass': False, 
     'bool_wind_speed': False, 
-    'kriging_Method': u'Empirical Bayesian', 
+    'kriging_method': u'Detrended', 
     'bool_thermal_radiation': False, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
@@ -76,6 +76,7 @@ date_now = datetime.datetime.now()
 s_now = date_now.strftime('%Y%d%b_%H%M%S')
 os.makedirs(scratchWS + '/Output_' + s_now)
 outFolder = scratchWS + '/Output_' + s_now
+data['out_folder'] = outFolder
 arcpy.AddMessage('Output Folder: ' + outFolder)
 
 #Define Functions
@@ -233,18 +234,92 @@ def DataTable(parameter, data_table):
     DeleteScratchData(scratch_data)
     return temp_stations
 
-def AirTemperature(clim_tab):
+def DetrendedMethod(parameter, data_table, date_stamp):
+    print('Detrended Kriging')
+    # Add unique ID field to temporary data table for use in OLS function
+    arcpy.management.AddField(in_table = data_table,
+            field_name = 'Unique_ID',
+            field_type = 'SHORT',
+            field_is_nullable = 'NULLABLE',
+            field_is_required = 'NON_REQUIRED')
+    arcpy.management.CalculateField(in_table = data_table,
+            field = 'Unique_ID',
+            expression = '!OBJECTID!',
+            expression_type = 'PYTHON_9.3')
+    #Run ordinary least squares of temporary data table
+    coef_table = arcpy.management.CreateTable(data['scratch_gdb'], 'coef_table_' + parameter)
+    ols = arcpy.stats.OrdinaryLeastSquares(Input_Feature_Class = data_table,
+            Unique_ID_Field = 'Unique_ID',
+            Output_Feature_Class = 'in_memory/fcResid',
+            Dependent_Variable = 'MEAN_' + parameter,
+            Explanatory_Variables = 'RASTERVALU',
+            Coefficient_Output_Table = coef_table)
+    intercept = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[0
+            ]
+    slope = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[1]
+    #Calculate residuals and add them to temporary data table
+    arcpy.management.AddField(in_table = data_table,
+            field_name = 'residual', 
+            field_type = 'DOUBLE',
+            field_is_nullable = 'NULLABLE',
+            field_is_required = 'NON_REQUIRED')
+    cursor = arcpy.UpdateCursor(data_table)
+    for row in cursor:
+        row.setValue('residual', row.getValue('MEAN_' + parameter) - ((slope * row.getValue('RASTERVALU')) + intercept))
+        cursor.updateRow(row)
+    del cursor
+    del row
+    #Run ordinary kriging on residuals
+    k_model = KrigingModelOrdinary('SPHERICAL', 460, 3686, .1214, .2192)
+    radius = RadiusFixed(10000, 1)
+    outKrig = Kriging(in_point_features = data_table, 
+            z_field = 'residual',
+            kriging_model = k_model,
+            cell_size = data['output_cell_size'],
+            search_radius = radius)
+    resid_raster = data['scratch_gdb'] + '/' + parameter
+    outKrig.save(resid_raster)
+    return_raster = arcpy.Raster(resid_raster) + (arcpy.Raster(data['dem']) * slope + intercept)
+    return_raster.save(data['out_folder'] + '/' + parameter + '_' + str(date_stamp) + '.tif')
+    #Delete scratch/residual data.
+    del outKrig
+    del k_model
+    del radius
+    arcpy.management.Delete(resid_raster)
+    return return_raster
+
+def AirTemperature(clim_tab, date_stamp):
     print('Air Temperature')
-    scratch_table = DataTable('air_temperature', clim_tab)
+    param = 'air_temperature'
+    scratch_table = DataTable(param, clim_tab)
     arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
+    
+    #Interpolate using the chosen method
+    if data['kriging_method'] == 'Detrended':
+        raster = DetrendedMethod(param, scratch_table, date_stamp)
+        #raster.save(data['out_folder'] + '/' + param + '.tif')
+    elif data['kriging_method'] == 'Combined':
+        raster = CombinedMethod(param, scratch_table, date_stamp)
+    else:
+        raster = EBKMethod(param, scratch_table, date_stamp)
     
     #Delete tempStations when done.
     arcpy.management.Delete(scratch_table)
 
-def DewPoint(clim_tab):
+def DewPoint(clim_tab, date_stamp):
     print('Dewpoint Temperature')
-    scratch_table = DataTable('dew_point', clim_tab)
+    param = 'dew_point'
+    scratch_table = DataTable(param, clim_tab)
     arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_dp')
+    
+    #Interpolate using the chosen method
+    if data['kriging_method'] == 'Detrended':
+        raster = DetrendedMethod(param, scratch_table, date_stamp)
+        raster.save(data['out_folder'] + '/' + param + '.tif')
+    elif data['kriging_method'] == 'Combined':
+        raster = CombinedMethod(param, scratch_table, date_stamp)
+    else:
+        raster = EBKMethod(param, scratch_table, date_stamp)
 
     #Delete tempStations when done
     arcpy.management.Delete(scratch_table)
@@ -254,13 +329,16 @@ def DeleteScratchData(in_list):
         arcpy.management.Delete(path)
     arcpy.management.Delete('in_memory')
 
+# Main Function --- Figure out a way to be run as script or as tool
+#======================================================================
 def main():
     #Checkout needed Extentions
     arcpy.CheckOutExtension('Spatial')
+    from_date_round = datetime.datetime.strptime(data['from_date'], '%Y-%m-%d %H:%M:%S')
+    to_date_round = datetime.datetime.strptime(data['to_date'], '%Y-%m-%d %H:%M:%S')
+    data['from_date'] = roundTime(from_date_round, 60*60)
     
-    data['from_date'] = roundTime(datetime.datetime.strptime(data['from_date'], '%Y-%m-%d %H:%M:%S'), 60*60)
-    
-    data['to_date'] = roundTime(datetime.datetime.strptime(data['to_date'], '%Y-%m-%d %H:%M:%S'))
+    data['to_date'] = roundTime(to_date_round)
     
     return_ws = selectWatershed(data['watershed'])
     data.update({'stations' : return_ws[0], 
@@ -340,15 +418,13 @@ def main():
             ls_scratch_data_imd.append(climate_table)
             # Run interpolation tools
             if data['bool_air_temperature']:
-                path_air_temp = AirTemperature(climate_table)
-                path_dew_point = DewPoint(climate_table)
+                path_air_temp = AirTemperature(climate_table, time_stamp)
+                path_dew_point = DewPoint(climate_table, time_stamp)
             DeleteScratchData(ls_scratch_data_imd)
         
         
         date_increment += delta
     DeleteScratchData(ls_scratch_data)
 
-# Main Function --- Figure out a way to be run as script or as tool
-#======================================================================
 if __name__ == '__main__':
     main() 
