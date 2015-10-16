@@ -49,7 +49,8 @@ def airTemperature():
         outExtractByMask = ExtractByMask(scratchGDB + '/airTemperature_residual', rc_elevation)
         outExtractByMask.save(scratchGDB + '/airTemperature_scratch')
         lsScratchData_Imd.append(scratchGDB + '/airTemperature_scratch')
-
+        
+        #Add back elevation trends and save final raster
         output_raster = arcpy.Raster(scratchGDB + "/airTemperature_scratch") + (arcpy.Raster(rc_elevation) * slope + intercept)
         output_raster.save(outFolder + "/air_temperature_" + sTimeStamp + ".tif")
     #Check if interpolation method is Empirical Bayesian or Detrended

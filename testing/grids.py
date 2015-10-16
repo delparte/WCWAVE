@@ -55,7 +55,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_dew_point': False, 
     'bool_precip_mass': False, 
     'bool_wind_speed': False, 
-    'kriging_method': u'Empirical Bayesian Kriging', 
+    'kriging_method': u'Combined', 
     'bool_thermal_radiation': False, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
@@ -294,9 +294,11 @@ def DetrendedMethod(parameter, data_table, date_stamp):
 
 def EBKMethod(parameter, data_table, date_stamp):
     print('Empirical Bayesian Kriging')
+    scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], parameter, date_stamp)
     arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
             z_field = 'MEAN_' + parameter,
-            out_raster = data['scratch_gdb'] + '/' + parameter,
+            out_raster = scratch_raster,
             cell_size = data['output_cell_size'],
             transformation_type = 'EMPIRICAL',
             max_local_points = '100',
@@ -307,16 +309,79 @@ def EBKMethod(parameter, data_table, date_stamp):
             quantile_value = '0.5',
             threshold_type = 'EXCEED',
             semivariogram_model_type='WHITTLE_DETRENDED')
-    outExtract = ExtractByMask(data['scratch_gdb'] + '/' + parameter, data['dem'])
-    outExtract.save(data['out_folder'] + '/' + parameter + '_' + str(date_stamp) + '.tif')
-    arcpy.management.Delete(data['scratch_gdb'] + '/' + parameter)
-    return data['out_folder'] + '/' + parameter + '_' + str(date_stamp) + '.tif'
+    #Mask output to size of original DEM
+    outExtract = ExtractByMask(scratch_raster, data['dem'])
+    outExtract.save(out_raster_name)
+    arcpy.management.Delete(scratch_raster)
+    return out_raster_name
+
+def CombinedMethod(parameter, data_table, date_stamp):
+    print('Combined Method')
+    scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
+    resid_raster = '{0}/{1}_{2}'.format(data['scratch_gdb'], parameter, 'residual')
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], parameter, date_stamp)
+    # Add unique ID field to temporary data table for use in OLS function
+    arcpy.management.AddField(in_table = data_table,
+            field_name = 'Unique_ID',
+            field_type = 'SHORT',
+            field_is_nullable = 'NULLABLE',
+            field_is_required = 'NON_REQUIRED')
+    arcpy.management.CalculateField(in_table = data_table,
+            field = 'Unique_ID',
+            expression = '!OBJECTID!',
+            expression_type = 'PYTHON_9.3')
+    #Run ordinary least squares of temporary data table
+    coef_table = arcpy.management.CreateTable(data['scratch_gdb'], 'coef_table_' + parameter)
+    ols = arcpy.stats.OrdinaryLeastSquares(Input_Feature_Class = data_table,
+            Unique_ID_Field = 'Unique_ID',
+            Output_Feature_Class = 'in_memory/fcResid',
+            Dependent_Variable = 'MEAN_' + parameter,
+            Explanatory_Variables = 'RASTERVALU',
+            Coefficient_Output_Table = coef_table)
+    intercept = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[0]
+    slope = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[1]
+    #Calculate residuals and add them to temporary data table
+    arcpy.management.AddField(in_table = data_table,
+            field_name = 'residual', 
+            field_type = 'DOUBLE',
+            field_is_nullable = 'NULLABLE',
+            field_is_required = 'NON_REQUIRED')
+    cursor = arcpy.UpdateCursor(data_table)
+    for row in cursor:
+        row_math = row.getValue('MEAN_' + parameter) - ((slope * row.getValue('RASTERVALU')) + intercept)
+        row.setValue('residual', row_math)
+        cursor.updateRow(row)
+    del cursor
+    del row
+    arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
+            z_field = 'MEAN_' + parameter,
+            out_raster = resid_raster,
+            cell_size = data['output_cell_size'],
+            transformation_type = 'EMPIRICAL',
+            max_local_points = '100',
+            overlap_factor = '1',
+            number_semivariograms = '100',
+            search_neighborhood = 'NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2',
+            output_type = 'PREDICTION',
+            quantile_value = '0.5',
+            threshold_type = 'EXCEED',
+            semivariogram_model_type='WHITTLE_DETRENDED')
+    out_extract = ExtractByMask(resid_raster, data['dem'])
+    out_extract.save(scratch_raster)
+
+    #Add back elevation trends and save final raster
+    output_raster = arcpy.Raster(scratch_raster) + (arcpy.Raster(data['dem']) * slope + intercept)
+    output_raster.save(out_raster_name)
+
+    arcpy.management.Delete(scratch_raster)
+    arcpy.management.Delete(resid_raster)
+    return out_raster_name
 
 def AirTemperature(clim_tab, date_stamp):
     print('Air Temperature')
     param = 'air_temperature'
     scratch_table = DataTable(param, clim_tab)
-    arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
+    #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
     
     #Interpolate using the chosen method
     if data['kriging_method'] == 'Detrended':
@@ -329,12 +394,13 @@ def AirTemperature(clim_tab, date_stamp):
     
     #Delete tempStations when done.
     arcpy.management.Delete(scratch_table)
+    return raster
 
 def DewPoint(clim_tab, date_stamp):
     print('Dewpoint Temperature')
     param = 'dew_point'
     scratch_table = DataTable(param, clim_tab)
-    arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_dp')
+    #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_dp')
     
     #Interpolate using the chosen method
     if data['kriging_method'] == 'Detrended':
@@ -347,6 +413,7 @@ def DewPoint(clim_tab, date_stamp):
 
     #Delete tempStations when done
     arcpy.management.Delete(scratch_table)
+    return raster
 
 def DeleteScratchData(in_list):
     for path in in_list:
@@ -424,9 +491,9 @@ def main():
             time_stamp = date_increment.strftime('%Y%m%d_%H')
             to_date_temp = date_increment + delta
             to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
-            query = ("SELECT * FROM weather WHERE "\
-                "date_time >= '" + from_date + "' "\
-                "AND date_time < '" + to_date + "'")
+            query = ('SELECT * FROM weather WHERE '\
+                'date_time >= "' + from_date + '" '\
+                'AND date_time < "' + to_date + '"')
             cur = db_cnx.cursor()
             cur.execute(query)
             i_num_return = cur.rowcount
@@ -450,4 +517,12 @@ def main():
     DeleteScratchData(ls_scratch_data)
 
 if __name__ == '__main__':
-    main() 
+    main()
+##     import cProfile
+##     import pstats
+##     pr = cProfile.Profile()
+##     pr.enable()
+##     main()
+##     pr.disable()
+##     ps = pstats.Stats(pr).sort_stats('cumulative')
+##     ps.print_stats(25)
