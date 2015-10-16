@@ -17,6 +17,7 @@ import subprocess
 arcpy.CheckOutExtension('Spatial')
 arcpy.CheckOutExtension('GeoStats')
 
+#Dictionary to hold all user input data.  
 ## data = {'watershed' : arcpy.GetParameterAsText(0),
 ##     'from_date' : arcpy.GetParameterAsText(1),
 ##     'to_date' : arcpy.GetParameterAsText(2),
@@ -52,7 +53,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
     'db': 'jd_data', 
-    'bool_dew_point': False, 
+    'bool_dew_point': True, 
     'bool_precip_mass': False, 
     'bool_wind_speed': False, 
     'kriging_method': u'Combined', 
@@ -72,7 +73,7 @@ arcpy.AddMessage('Scratch Workspace: ' + scratchWS)
 scratchGDB = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
 
-#Add to data dict
+#Add workspace to data dict
 data['scratch_ws'] = scratchWS
 data['scratch_gdb'] = scratchGDB
 
@@ -174,13 +175,10 @@ def BuildClimateTable(params, num):
             field_type = ftype)
         keys.append(key)
     in_cursor = arcpy.InsertCursor(table)
-    # Sorry about this thing.  I meant it to be able to scale according to the
-    # type of data colelcted (ie. to make it simple to add different data to the
-    # list.  
+    #Add data from rows into climate table
     for j in range(0, num):
         row = in_cursor.newRow()
         for k in range(0, len(keys)):
-            # ---Explained---
             # keys[x] = site_key, air_temperature, etc.
             # params[keys[k][j] = value (ie -2.5)
             row.setValue(keys[k], params[keys[k]][j])
@@ -274,7 +272,8 @@ def DetrendedMethod(parameter, data_table, date_stamp):
     del cursor
     del row
     #Run ordinary kriging on residuals
-    k_model = KrigingModelOrdinary('SPHERICAL', 460, 3686, .1214, .2192)
+    k_model = KrigingModelOrdinary('SPHERICAL', 460, 3686, .1214, .2192) #Dewpoint kriging model
+    #k_model = KrigingModelOrdinary('LINEAR', 37.061494) #Air temp kriging model
     radius = RadiusFixed(10000, 1)
     outKrig = Kriging(in_point_features = data_table, 
             z_field = 'residual',
@@ -415,6 +414,36 @@ def DewPoint(clim_tab, date_stamp):
     arcpy.management.Delete(scratch_table)
     return raster
 
+def PercentSnow(dew_point, date_stamp):
+    inRas = Raster(dew_point)
+    outRas = '{0}/percent_snow_{1}.tif'.format(data['out_folder'], date_stamp)
+    out_snow_ras = arcpy.sa.Con(inRas < -5.0, 1.0, 
+                                    Con((inRas >= -5.0) & (inRas < -3.0), 1.0,
+                                       Con((inRas >= -3.0) & (inRas < -1.5), 1.0,
+                                           Con((inRas >= -1.5) & (inRas < -0.5), 1.0,
+                                               Con((inRas >= -0.5) & (inRas < 0.0), 0.75,
+                                                   Con((inRas >= 0.0) & (inRas < 0.5), 0.25,
+                                                       Con(inRas >= 0.5,0.0)))))))
+    arcpy.management.CopyRaster(in_raster = out_snow_ras, 
+            out_rasterdataset=outRas, 
+            pixel_type = '32_BIT_FLOAT')
+    return outRas
+
+def SnowDensity(dew_point, date_stamp):
+    inRas = Raster(dew_point)
+    outRas = '{0}/precipitation_snow_density_{1}.tif'.format(data['out_folder'], date_stamp)
+    out_snow_density = arcpy.sa.Con(inRas < -5.0, 1.0, 
+                                Con((inRas >= -5.0) & (inRas < -3.0), 1.0,
+                                   Con((inRas >= -3.0) & (inRas < -1.5), 1.0,
+                                       Con((inRas >= -1.5) & (inRas < -0.5), 1.0,
+                                           Con((inRas >= -0.5) & (inRas < 0.0), 0.75,
+                                               Con((inRas >= 0.0) & (inRas < 0.5), 0.25,
+                                                   Con(inRas >= 0.5,0.0)))))))
+    arcpy.management.CopyRaster(in_raster = out_snow_density, 
+            out_rasterdataset = outRas,
+            pixel_type = '32_BIT_FLOAT')
+    return outRas
+
 def DeleteScratchData(in_list):
     for path in in_list:
         arcpy.management.Delete(path)
@@ -509,7 +538,10 @@ def main():
             # Run interpolation tools
             if data['bool_air_temperature']:
                 path_air_temp = AirTemperature(climate_table, time_stamp)
+            if data['bool_dew_point']:
                 path_dew_point = DewPoint(climate_table, time_stamp)
+                path_percent_snow = PercentSnow(path_dew_point, time_stamp)
+                path_snow_density = SnowDensity(path_dew_point, time_stamp)
             DeleteScratchData(ls_scratch_data_imd)
         
         
