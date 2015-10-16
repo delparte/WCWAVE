@@ -79,10 +79,11 @@ def airTemperature():
         output_raster = arcpy.Raster(scratchGDB + "/airTemperature_residual") + (arcpy.Raster(rc_elevation) * slope + intercept)
         output_raster.save(outFolder + "/air_temperature_" + sTimeStamp + ".tif")
     else:
-        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_air_temperature", out_ga_layer="#", \
-            out_raster=outFolder + "/air_temperature_scratch_" + sTimeStamp + ".tif", cell_size=output_cell_size, transformation_type="EMPIRICAL", max_local_points="100", \
-            overlap_factor="1", number_semivariograms="100", search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", \
-            output_type="PREDICTION", quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
+        arcpy.EmpiricalBayesianKriging_ga(in_features=scratchGDB + "/tempStations", z_field="MEAN_air_temperature", \
+                out_ga_layer="#", out_raster=outFolder + "/air_temperature_scratch_" + sTimeStamp + ".tif", cell_size=output_cell_size,\
+                transformation_type="EMPIRICAL", max_local_points="100", overlap_factor="1", number_semivariograms="100",\
+                search_neighborhood="NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2", output_type="PREDICTION",\
+                quantile_value="0.5", threshold_type="EXCEED", probability_threshold="", semivariogram_model_type="WHITTLE_DETRENDED")
         outExtractByMask = ExtractByMask(outFolder + '/air_temperature_scratch_' + sTimeStamp + '.tif', rc_elevation)
         outExtractByMask.save(outFolder + '/air_temperature_' + sTimeStamp + '.tif')
         lsScratchData_Imd.append(outFolder + "/air_temperature_scratch_" + sTimeStamp + ".tif")

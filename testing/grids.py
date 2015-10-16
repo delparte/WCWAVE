@@ -43,7 +43,7 @@ arcpy.CheckOutExtension('GeoStats')
 
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
     'bool_air_temperature': True, 
-    'bool_vapor_pressure': False, 
+    'bool_vapor_pressure': True, 
     'to_date': u'2014-01-01 13:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
@@ -56,7 +56,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_dew_point': True, 
     'bool_precip_mass': False, 
     'bool_wind_speed': False, 
-    'kriging_method': u'Combined', 
+    'kriging_method': u'Detrended', 
     'bool_thermal_radiation': False, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
@@ -80,7 +80,7 @@ data['scratch_gdb'] = scratchGDB
 date_now = datetime.datetime.now()
 s_now = date_now.strftime('%Y%d%b_%H%M%S')
 os.makedirs(scratchWS + '/Output_' + s_now)
-outFolder = scratchWS + '/Output_' + s_now
+outFolder = '{0}/Output_{1}'.format(scratchWS, s_now) 
 data['out_folder'] = outFolder
 arcpy.AddMessage('Output Folder: ' + outFolder)
 
@@ -236,8 +236,10 @@ def DataTable(parameter, data_table):
     DeleteScratchData(scratch_data)
     return temp_stations
 
-def DetrendedMethod(parameter, data_table, date_stamp):
+def DetrendedMethod(parameter, data_table, date_stamp, out_ras):
     print('Detrended Kriging')
+    resid_raster = data['scratch_gdb'] + '/' + parameter
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_ras, date_stamp)
     # Add unique ID field to temporary data table for use in OLS function
     arcpy.management.AddField(in_table = data_table,
             field_name = 'Unique_ID',
@@ -272,29 +274,30 @@ def DetrendedMethod(parameter, data_table, date_stamp):
     del cursor
     del row
     #Run ordinary kriging on residuals
-    k_model = KrigingModelOrdinary('SPHERICAL', 460, 3686, .1214, .2192) #Dewpoint kriging model
-    #k_model = KrigingModelOrdinary('LINEAR', 37.061494) #Air temp kriging model
+    #Dewpoint/Vapor pressure kriging model
+    k_model = KrigingModelOrdinary('SPHERICAL', 460, 3686, .1214, .2192)     
+    #Air temp kriging model
+    #k_model = KrigingModelOrdinary('LINEAR', 37.061494) 
     radius = RadiusFixed(10000, 1)
     outKrig = Kriging(in_point_features = data_table, 
             z_field = 'residual',
             kriging_model = k_model,
             cell_size = data['output_cell_size'],
             search_radius = radius)
-    resid_raster = data['scratch_gdb'] + '/' + parameter
     outKrig.save(resid_raster)
     return_raster = arcpy.Raster(resid_raster) + (arcpy.Raster(data['dem']) * slope + intercept)
-    return_raster.save(data['out_folder'] + '/' + parameter + '_' + str(date_stamp) + '.tif')
+    return_raster.save(out_raster_name)
     #Delete scratch/residual data.
     del outKrig
     del k_model
     del radius
     arcpy.management.Delete(resid_raster)
-    return return_raster
+    return out_raster_name
 
-def EBKMethod(parameter, data_table, date_stamp):
+def EBKMethod(parameter, data_table, date_stamp, out_ras):
     print('Empirical Bayesian Kriging')
     scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
-    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], parameter, date_stamp)
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_ras, date_stamp)
     arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
             z_field = 'MEAN_' + parameter,
             out_raster = scratch_raster,
@@ -314,11 +317,11 @@ def EBKMethod(parameter, data_table, date_stamp):
     arcpy.management.Delete(scratch_raster)
     return out_raster_name
 
-def CombinedMethod(parameter, data_table, date_stamp):
+def CombinedMethod(parameter, data_table, date_stamp, out_ras):
     print('Combined Method')
     scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
     resid_raster = '{0}/{1}_{2}'.format(data['scratch_gdb'], parameter, 'residual')
-    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], parameter, date_stamp)
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_ras, date_stamp)
     # Add unique ID field to temporary data table for use in OLS function
     arcpy.management.AddField(in_table = data_table,
             field_name = 'Unique_ID',
@@ -376,20 +379,26 @@ def CombinedMethod(parameter, data_table, date_stamp):
     arcpy.management.Delete(resid_raster)
     return out_raster_name
 
+def Krig(parameter, scratch_table, date_stamp, out_name):
+    #Interpolate using the chosen method
+    if data['kriging_method'] == 'Detrended':
+        raster = DetrendedMethod(parameter, scratch_table, date_stamp, out_name)
+        #raster.save(data['out_folder'] + '/' + param + '.tif')
+    elif data['kriging_method'] == 'Combined':
+        raster = CombinedMethod(parameter, scratch_table, date_stamp, out_name)
+    else:
+        raster = EBKMethod(parameter, scratch_table, date_stamp, out_name)
+    return raster
+
 def AirTemperature(clim_tab, date_stamp):
     print('Air Temperature')
     param = 'air_temperature'
+    out_raster_title = 'T_a'
     scratch_table = DataTable(param, clim_tab)
     #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
     
-    #Interpolate using the chosen method
-    if data['kriging_method'] == 'Detrended':
-        raster = DetrendedMethod(param, scratch_table, date_stamp)
-        #raster.save(data['out_folder'] + '/' + param + '.tif')
-    elif data['kriging_method'] == 'Combined':
-        raster = CombinedMethod(param, scratch_table, date_stamp)
-    else:
-        raster = EBKMethod(param, scratch_table, date_stamp)
+    #Kriging
+    raster = Krig(param, scratch_table, date_stamp, out_raster_title)
     
     #Delete tempStations when done.
     arcpy.management.Delete(scratch_table)
@@ -399,16 +408,11 @@ def DewPoint(clim_tab, date_stamp):
     print('Dewpoint Temperature')
     param = 'dew_point'
     scratch_table = DataTable(param, clim_tab)
+    out_raster_title = 'T_pp'
     #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_dp')
     
-    #Interpolate using the chosen method
-    if data['kriging_method'] == 'Detrended':
-        raster = DetrendedMethod(param, scratch_table, date_stamp)
-        raster.save(data['out_folder'] + '/' + param + '.tif')
-    elif data['kriging_method'] == 'Combined':
-        raster = CombinedMethod(param, scratch_table, date_stamp)
-    else:
-        raster = EBKMethod(param, scratch_table, date_stamp)
+    #Kriging
+    raster = Krig(param, scratch_table, date_stamp, out_raster_title)
 
     #Delete tempStations when done
     arcpy.management.Delete(scratch_table)
@@ -431,7 +435,7 @@ def PercentSnow(dew_point, date_stamp):
 
 def SnowDensity(dew_point, date_stamp):
     inRas = Raster(dew_point)
-    outRas = '{0}/precipitation_snow_density_{1}.tif'.format(data['out_folder'], date_stamp)
+    outRas = '{0}/rho_snow_{1}.tif'.format(data['out_folder'], date_stamp)
     out_snow_density = arcpy.sa.Con(inRas < -5.0, 1.0, 
                                 Con((inRas >= -5.0) & (inRas < -3.0), 1.0,
                                    Con((inRas >= -3.0) & (inRas < -1.5), 1.0,
@@ -443,6 +447,54 @@ def SnowDensity(dew_point, date_stamp):
             out_rasterdataset = outRas,
             pixel_type = '32_BIT_FLOAT')
     return outRas
+
+def VaporPressure(clim_tab, date_stamp):
+    print('Vapor Pressure')
+    param = 'vapor_pressure'
+    scratch_table = DataTable(param, clim_tab)
+    out_raster_title = 'e_a'
+    #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
+    
+    #Kriging
+    raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+
+    #Delete tempStations when done.
+    arcpy.management.Delete(scratch_table)
+    return raster
+
+def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
+    print('Solar Radiation')
+    param = 'in_solar_radiation'
+    out_raster_title = 'S_a'
+    scratch_table = DataTable(param, clim_tab)
+    
+    #set up area solar radiation tool parameters and run the tool
+    #Set up time parameters
+    day_of_year = date_time.timetiple().tm_yday
+    i_sr_start = int(date_time.strftime('%H'))
+    i_sr_end = i_sr_start + date['time_step']
+    in_twd = TimeWithinDay(day_of_year, i_sr_start, i_sr_end)
+
+    glob_rad_raster = data['scratch_gdb'] + '/glob_rad_raster'
+    sim_points = data['scratch_gdb'] + '/simPoints'
+    sky_size = 200
+
+    out_global_radiation = AreaSoloarRadiation(data['dem'], '', sky_size, i_twd)
+    out_global_radiation = out_global_radiation / date['time_step']
+    
+    #Correct global radation raster for cloud conditions
+    #Extract simulated global radiation values to station location feature class
+    arcpy.management.AlterField(in_table = clim_tab,
+            field = 'RASTERVALU',
+            new_field_name = 'Elevation')
+    arcpy.gp.ExtractValuesToPoints_sa(in_point_features = clim_tab,
+            in_raster = out_global_radation, 
+            our_point_features = sim_points,
+            interpolate_values = 'NONE', 
+            add_attributes = 'VALUE_ONLY')
+
+    arcpy.management.Delete(scratch_table)
+    return 0
 
 def DeleteScratchData(in_list):
     for path in in_list:
@@ -542,6 +594,12 @@ def main():
                 path_dew_point = DewPoint(climate_table, time_stamp)
                 path_percent_snow = PercentSnow(path_dew_point, time_stamp)
                 path_snow_density = SnowDensity(path_dew_point, time_stamp)
+            if data['bool_vapor_pressure']:
+                path_vapor_pressure = VaporPressure(climate_table, time_stamp)
+            if data['bool_wind_speed']:
+                path_wind_speed = WindSpeed()
+            if data['bool_solar_radiation']:
+                path_solar_radiation = SolarRadiation(climate_table, time_stamp, date_increment)
             DeleteScratchData(ls_scratch_data_imd)
         
         
