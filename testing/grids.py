@@ -42,18 +42,18 @@ arcpy.CheckOutExtension('GeoStats')
 ## }
 
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
-    'bool_air_temperature': True, 
-    'bool_vapor_pressure': True, 
-    'to_date': u'2014-01-01 13:00:00', 
+    'bool_air_temperature': False, 
+    'bool_vapor_pressure': False, 
+    'to_date': u'2014-01-13 13:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
-    'from_date': u'2014-01-01 12:00:00', 
-    'bool_solar_radiation': False, 
+    'from_date': u'2014-01-13 12:00:00', 
+    'bool_solar_radiation': True, 
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
     'db': 'jd_data', 
-    'bool_dew_point': True, 
+    'bool_dew_point': False, 
     'bool_precip_mass': False, 
     'bool_wind_speed': False, 
     'kriging_method': u'Detrended', 
@@ -191,10 +191,11 @@ def DataTable(parameter, data_table):
     ''' Create paramater scratch table to be used for interpolation '''
     scratch_data = []
     temp_table1 = parameter + '_table'
+    temp_table2 = 'in_memory/' + parameter + '_table2'
+    clause = parameter + ' > -500'
     out = arcpy.management.MakeTableView(in_table = data_table,
             out_view = temp_table1,
-            where_clause = parameter + ' > -500')
-    temp_table2 = 'in_memory/' + parameter + '_table2'
+            where_clause = clause)
     scratch_data.append(temp_table1)
     out_mem = arcpy.analysis.Statistics(in_table = temp_table1,
             out_table = temp_table2,
@@ -464,40 +465,66 @@ def VaporPressure(clim_tab, date_stamp):
 
 def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
     print('Solar Radiation')
-    param = 'in_solar_radiation'
+    scratch_data = []
+    param = 'solar_radiation'
     out_raster_title = 'S_a'
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_raster_title, date_stamp)
     scratch_table = DataTable(param, clim_tab)
+    scratch_data.append(scratch_table)
     
     #set up area solar radiation tool parameters and run the tool
     #Set up time parameters
-    day_of_year = date_time.timetiple().tm_yday
+    day_of_year = date_time.timetuple().tm_yday
     i_sr_start = int(date_time.strftime('%H'))
-    i_sr_end = i_sr_start + date['time_step']
+    i_sr_end = i_sr_start + data['time_step']
     in_twd = TimeWithinDay(day_of_year, i_sr_start, i_sr_end)
 
     glob_rad_raster = data['scratch_gdb'] + '/glob_rad_raster'
     sim_points = data['scratch_gdb'] + '/simPoints'
     sky_size = 200
+    scratch_data.append(glob_rad_raster)
+    scratch_data.append(sim_points)
 
-    out_global_radiation = AreaSoloarRadiation(data['dem'], '', sky_size, i_twd)
-    out_global_radiation = out_global_radiation / date['time_step']
+    out_global_radiation = AreaSolarRadiation(data['dem'], '', sky_size, in_twd)
+    out_global_radiation = out_global_radiation / data['time_step']
     
-    #Correct global radation raster for cloud conditions
+    #Correct global radiation raster for cloud conditions
     #Extract simulated global radiation values to station location feature class
-    arcpy.management.AlterField(in_table = clim_tab,
+    arcpy.management.AlterField(in_table = scratch_table,
             field = 'RASTERVALU',
             new_field_name = 'Elevation')
-    arcpy.gp.ExtractValuesToPoints_sa(in_point_features = clim_tab,
-            in_raster = out_global_radation, 
-            our_point_features = sim_points,
+    arcpy.sa.ExtractValuesToPoints(in_point_features = scratch_table,
+            in_raster = out_global_radiation, 
+            out_point_features = sim_points,
             interpolate_values = 'NONE', 
             add_attributes = 'VALUE_ONLY')
+    
+    arcpy.management.AddField(in_table = sim_points, 
+            field_name = 'ratio',
+            field_type = 'FLOAT', 
+            field_is_nullable = 'NULLABLE',
+            field_is_required = 'NON_REQUIRED')
+    arcpy.management.CalculateField(in_table = sim_points, 
+            field = 'ratio',
+            expression = '!MEAN_solar_radiation!/ !RASTERVALU!',
+            expression_type = 'PYTHON_9.3')
+    #convert 'ration' field to numpy array
+    na = arcpy.da.TableToNumPyArray(sim_points, 'ratio')
 
+    #calculate average ratio
+    d_mean_ratio = numpy.mean(na['ratio'])
+    d_mean_ratio2 = numpy.asscalar(d_mean_ratio)
+    
+    #multiply simulated raster by average ratio
+    out_global_radiation_corrected = out_global_radiation * d_mean_ratio2
+    out_global_radiation_corrected.save(out_raster_name)
+    
     arcpy.management.Delete(scratch_table)
-    return 0
+    return out_raster_name
 
 def DeleteScratchData(in_list):
     for path in in_list:
+        #print path
         arcpy.management.Delete(path)
     arcpy.management.Delete('in_memory')
 
@@ -599,7 +626,8 @@ def main():
             if data['bool_wind_speed']:
                 path_wind_speed = WindSpeed()
             if data['bool_solar_radiation']:
-                path_solar_radiation = SolarRadiation(climate_table, time_stamp, date_increment)
+                path_solar_radiation = SolarRadiation(climate_table, time_stamp, date_increment,data['time_step'] )
+                print(path_solar_radiation)
             DeleteScratchData(ls_scratch_data_imd)
         
         
