@@ -44,11 +44,11 @@ arcpy.CheckOutExtension('GeoStats')
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
     'bool_air_temperature': False, 
     'bool_vapor_pressure': False, 
-    'to_date': u'2014-01-13 13:00:00', 
+    'to_date': u'2014-01-13 19:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
-    'from_date': u'2014-01-13 12:00:00', 
+    'from_date': u'2014-01-13 18:00:00', 
     'bool_solar_radiation': True, 
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
@@ -626,8 +626,18 @@ def main():
             if data['bool_wind_speed']:
                 path_wind_speed = WindSpeed()
             if data['bool_solar_radiation']:
-                path_solar_radiation = SolarRadiation(climate_table, time_stamp, date_increment,data['time_step'] )
-                print(path_solar_radiation)
+##                 try: 
+                path_solar_radiation = SolarRadiation(climate_table,
+                            time_stamp, 
+                            date_increment,
+                            data['time_step'])
+##                 except arcpy.ExecuteError:
+##                     msgs = arcpy.GetMessages(2)
+##                     #arcpy.AddMessage(msgs)
+##                     if 'Failed to open raster dataset' in msgs:
+##                         arcpy.AddMessage("Skip night hours") 
+##             if data['bool_thermal_radiation']:
+
             DeleteScratchData(ls_scratch_data_imd)
         
         
