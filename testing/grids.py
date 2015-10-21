@@ -44,11 +44,11 @@ arcpy.CheckOutExtension('GeoStats')
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
     'bool_air_temperature': False, 
     'bool_vapor_pressure': False, 
-    'to_date': u'2014-01-13 19:00:00', 
+    'to_date': u'2014-01-13 12:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
-    'from_date': u'2014-01-13 18:00:00', 
+    'from_date': u'2014-01-13 11:00:00', 
     'bool_solar_radiation': True, 
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
@@ -469,8 +469,6 @@ def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
     param = 'solar_radiation'
     out_raster_title = 'S_a'
     out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_raster_title, date_stamp)
-    scratch_table = DataTable(param, clim_tab)
-    scratch_data.append(scratch_table)
     
     #set up area solar radiation tool parameters and run the tool
     #Set up time parameters
@@ -478,16 +476,25 @@ def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
     i_sr_start = int(date_time.strftime('%H'))
     i_sr_end = i_sr_start + data['time_step']
     in_twd = TimeWithinDay(day_of_year, i_sr_start, i_sr_end)
+    sky_size = 200
 
+    try: 
+        out_global_radiation = AreaSolarRadiation(data['dem'], '', sky_size, in_twd)
+        out_global_radiation = out_global_radiation / data['time_step']
+    except arcpy.ExecuteError:
+        msgs = arcpy.GetMessages(2)
+        #arcpy.AddMessage(msgs)
+        if 'Failed to open raster dataset' in msgs or 'Error in creating sun map' in msgs:
+            arcpy.AddMessage("Skip night hours")
+            return
+    #Set up scratch data table
+    scratch_table = DataTable(param, clim_tab)
+    scratch_data.append(scratch_table)
+    
     glob_rad_raster = data['scratch_gdb'] + '/glob_rad_raster'
     sim_points = data['scratch_gdb'] + '/simPoints'
-    sky_size = 200
     scratch_data.append(glob_rad_raster)
     scratch_data.append(sim_points)
-
-    out_global_radiation = AreaSolarRadiation(data['dem'], '', sky_size, in_twd)
-    out_global_radiation = out_global_radiation / data['time_step']
-    
     #Correct global radiation raster for cloud conditions
     #Extract simulated global radiation values to station location feature class
     arcpy.management.AlterField(in_table = scratch_table,
