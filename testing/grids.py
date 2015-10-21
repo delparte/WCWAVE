@@ -187,25 +187,45 @@ def BuildClimateTable(params, num):
     del row
     return table
 
-def DataTable(parameter, data_table):
+def DataTable(parameter, data_table, thermal_fields = []):
     ''' Create paramater scratch table to be used for interpolation '''
     scratch_data = []
     temp_table1 = parameter + '_table'
     temp_table2 = 'in_memory/' + parameter + '_table2'
-    clause = parameter + ' > -500'
+    if len(thermal_fields) > 0:
+        #Thermal radation stats_fields 
+        #  format - [['air_temperature', 'MEAN'], ['vapor_pressure', 'MEAN']]
+        stats_fields = [] 
+        clause = thermal_fields[0] + ' > -500 AND ' + thermal_fields[1] + ' > -500'
+        for l in thermal_fields:
+            stats_fields.append([l, 'MEAN'])
+    else: # regular parameters
+        stats_fields = parameter + ' MEAN'
+        clause = parameter + ' > -500'
+    # Make new temporary table
     out = arcpy.management.MakeTableView(in_table = data_table,
             out_view = temp_table1,
             where_clause = clause)
     scratch_data.append(temp_table1)
     out_mem = arcpy.analysis.Statistics(in_table = temp_table1,
             out_table = temp_table2,
-            statistics_fields = parameter + ' MEAN',
+            statistics_fields = stats_fields,
             case_field = 'site_key')
     # Copy stats to tempStations feature class
     temp_stations = arcpy.management.CopyFeatures(in_features = data['fc_stations_elev'],
             out_feature_class = data['scratch_gdb'] + '/tempStations')
     # Join stats to temp stations feature class
-    arcpy.management.JoinField(in_data = temp_stations, 
+    if len(thermal_fields) > 0:
+        tr_fields = []
+        for l in thermal_fields:
+            tr_fields.append('MEAN_' + l)
+        arcpy.management.JoinField(in_data = temp_stations,
+                in_field = 'Site_key',
+                join_table = temp_table2,
+                join_field = 'site_key',
+                fields = tr_fields)
+    else:
+        arcpy.management.JoinField(in_data = temp_stations, 
             in_field = 'Site_Key',
             join_table = temp_table2,
             join_field = 'site_key',
@@ -226,12 +246,20 @@ def DataTable(parameter, data_table):
     del row
     # Delete rows from feature class that have null values for paramter
     cursor = arcpy.UpdateCursor(temp_stations)
-    for row in cursor:
-        if row.isNull('MEAN_' + parameter):
-            cursor.deleteRow(row)
-        else:
-            row.setValue('MEAN_' + parameter, round(row.getValue('MEAN_' + parameter), 2))
-            cursor.updateRow(row)
+    if len(thermal_fields) > 0:
+        #thermal Radiation check
+        for row in cursor:
+            val0 = 'MEAN_' + thermal_fields[0]
+            val1 = 'MEAN_' + thermal_fields[1]
+            if row.isNull(val0) or row.isNull(val1):
+                cursor.deleteRow(row)
+    else:
+        for row in cursor:
+            if row.isNull('MEAN_' + parameter):
+                cursor.deleteRow(row)
+            else:
+                row.setValue('MEAN_' + parameter, round(row.getValue('MEAN_' + parameter), 2))
+                cursor.updateRow(row)
     del cursor
     del row
     DeleteScratchData(scratch_data)
