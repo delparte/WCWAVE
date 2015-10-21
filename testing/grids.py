@@ -215,7 +215,7 @@ def DataTable(parameter, data_table, thermal_fields = []):
     temp_stations = arcpy.management.CopyFeatures(in_features = data['fc_stations_elev'],
             out_feature_class = data['scratch_gdb'] + '/tempStations')
     # Join stats to temp stations feature class
-    if len(thermal_fields) > 0:
+    if len(thermal_fields) > 0: #Thermal radiation
         tr_fields = []
         for l in thermal_fields:
             tr_fields.append('MEAN_' + l)
@@ -224,7 +224,7 @@ def DataTable(parameter, data_table, thermal_fields = []):
                 join_table = temp_table2,
                 join_field = 'site_key',
                 fields = tr_fields)
-    else:
+    else: # Regular paramters
         arcpy.management.JoinField(in_data = temp_stations, 
             in_field = 'Site_Key',
             join_table = temp_table2,
@@ -560,19 +560,80 @@ def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
 def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
     print('Thermal Radiation')
     param = 'thermal_radiation'
-
+    out_raster_title = 'I_lw'
+    out_file = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_raster_title, date_stamp)
     z = data['dem']
     vf = data['view_factor']
     T_a = in_air
     vp = in_vap
-
+    
     fields = ['air_temperature', 'vapor_pressure']
     scratch_table = DataTable(param, clim_tab, thermal_fields=fields)
     P_m = 0.0
     T_m = 0.0
     z_m = 0.0
-    Ts = in_surface_temp
+    T_s = in_surface_temp
+    cursor = arcpy.UpdateCursor(scratch_table) 
+    for row in cursor:
+        z_m = row.getValue('RASTERVALU')
+        P_m = row.getValue('MEAN_vapor_pressure')
+        T_m = row.getValue('MEAN_air_temperature')
+        cursor.deleteRow(row)
+        break
+    del cursor
+    del row
     
+    arcpy.AddMessage("P_m: " + str(P_m))
+    arcpy.AddMessage("T_m: " + str(T_m))
+    arcpy.AddMessage("z_m: " + str(z_m))
+    arcpy.AddMessage("T_s: " + str(T_s))
+    
+    # Constants
+    g = 9.8
+    m = 0.0289
+    R = 8.3143
+    sigma = 5.6697 * 10 ** -8
+    epsilon_s = 0.95
+    gamma = -0.006
+    
+    # convert temperature parameters to Kelvin
+    T_m = T_m + 274.15
+    T_s = T_s + 274.15
+    T_a = arcpy.sa.Float(Raster(T_a) + 274.15)
+    
+    # convert vapor pressure to mb
+    P_m = P_m * 0.01
+    vp = arcpy.sa.Float(Raster(vp) * 0.01)
+    
+    #Correct air temperature and vapor pressure rasters (Marks and Dozier (1979), pg. 164)
+    #(4) corrected air temperature
+    T_prime = T_a + (0.0065 * Raster(z))
+    #saturated vapor pressure from original air temperature (T_a)
+    e_sa = arcpy.sa.Float(6.11 * 10**((7.5*arcpy.sa.Float(T_a))/(237.3 + arcpy.sa.Float(T_a))))
+    #saturated vapor pressure from corrected air temperature (T_prime)
+    e_sprime = arcpy.sa.Float(6.11 * 10**((7.5*arcpy.sa.Float(T_a))/(237.3 + arcpy.sa.Float(T_a))))
+    rh = arcpy.sa.Float(vp / e_sa) #(5) relative humidity
+    e_prime = arcpy.sa.Float(rh * e_sprime) #(6) corrected vapor pressure
+    
+    #Pressure at a given elevation (Marks and Dozier (1979), pg. 168-169)
+    term1 = ((-g*m)/(R*gamma))
+    delta_z = Raster(z) - z_m
+    term2 = ((T_m + gamma * delta_z)) / T_m
+    lnTerm = arcpy.sa.Ln(term2)
+    expTerm = arcpy.sa.Exp(term1 * lnTerm)
+    P_a = P_m * expTerm #(10) air pressure
+    
+    #effective emissivity (Marks and Dozier (1979), pg. 164)
+    epsilon_a = arcpy.sa.Float((1.24 * (e_prime / T_prime)**(1/7)) * (P_a / 1013.0)) #(7)
+    
+    #Incoming longwave radiation (Marks and Dozier (1979), pg. 164)
+    term3 = arcpy.sa.Float((epsilon_a * sigma * (T_a ** 4)) * vf)
+    term4 = arcpy.sa.Float(epsilon_s * sigma * (T_s ** 4))
+    term5 = (1 - Raster(vf))
+    output_thermal_radiation = arcpy.sa.Float(term3 + (term4 * term5)) #(9)
+    output_thermal_radiation.save(out_file)
+    
+    return out_file
 
 def DeleteScratchData(in_list):
     for path in in_list:
