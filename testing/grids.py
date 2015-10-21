@@ -49,7 +49,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
     'from_date': u'2014-01-13 11:00:00', 
-    'bool_solar_radiation': True, 
+    'bool_solar_radiation': False, 
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
     'db': 'jd_data', 
@@ -57,7 +57,7 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'bool_precip_mass': False, 
     'bool_wind_speed': False, 
     'kriging_method': u'Detrended', 
-    'bool_thermal_radiation': False, 
+    'bool_thermal_radiation': True, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
     'watershed': u'Johnston Draw', 
@@ -557,6 +557,23 @@ def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
     arcpy.management.Delete(scratch_table)
     return out_raster_name
 
+def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
+    print('Thermal Radiation')
+    param = 'thermal_radiation'
+
+    z = data['dem']
+    vf = data['view_factor']
+    T_a = in_air
+    vp = in_vap
+
+    fields = ['air_temperature', 'vapor_pressure']
+    scratch_table = DataTable(param, clim_tab, thermal_fields=fields)
+    P_m = 0.0
+    T_m = 0.0
+    z_m = 0.0
+    Ts = in_surface_temp
+    
+
 def DeleteScratchData(in_list):
     for path in in_list:
         #print path
@@ -566,6 +583,7 @@ def DeleteScratchData(in_list):
 # Main Function --- Figure out a way to be run as script or as tool
 #======================================================================
 def main():
+    tmp3 = 'ta' # used in SQL 
     from_date_round = datetime.datetime.strptime(data['from_date'], '%Y-%m-%d %H:%M:%S')
     to_date_round = datetime.datetime.strptime(data['to_date'], '%Y-%m-%d %H:%M:%S')
     data['from_date'] = roundTime(from_date_round, 60*60)
@@ -661,17 +679,28 @@ def main():
             if data['bool_wind_speed']:
                 path_wind_speed = WindSpeed()
             if data['bool_solar_radiation']:
-##                 try: 
                 path_solar_radiation = SolarRadiation(climate_table,
                             time_stamp, 
                             date_increment,
                             data['time_step'])
-##                 except arcpy.ExecuteError:
-##                     msgs = arcpy.GetMessages(2)
-##                     #arcpy.AddMessage(msgs)
-##                     if 'Failed to open raster dataset' in msgs:
-##                         arcpy.AddMessage("Skip night hours") 
-##             if data['bool_thermal_radiation']:
+            if data['bool_thermal_radiation']:
+                #Query database for average air temperature for current day
+                sFromTR = date_increment.strftime("%Y-%m-%d")
+                sQuery2 = ("SELECT AVG(NULLIF(" + tmp3 + ", -999)) FROM weather " 
+                           "WHERE date_time >= '" + sFromTR + " 00:00:00" + "' " 
+                           "AND date_time <= '" + sFromTR + " 23:00:00'")
+                print sQuery2
+                cur2 = db_cnx.cursor()
+                cur2.execute(sQuery2)
+                d_ref_temp = cur2.fetchone()[0]
+                cur2.close()
+                path_air_temp = r'C:\Users\chaptuck\AppData\Local\Temp\scratch\Output_201521Oct_151135\T_a_20140113_11.tif'
+                path_vapor_pressure = r'C:\Users\chaptuck\AppData\Local\Temp\scratch\Output_201521Oct_151135\e_a_20140113_11.tif'
+                path_thermal_radiation = ThermalRadiation(climate_table, 
+                        time_stamp, 
+                        path_air_temp, 
+                        path_vapor_pressure, 
+                        d_ref_temp)
 
             DeleteScratchData(ls_scratch_data_imd)
         
