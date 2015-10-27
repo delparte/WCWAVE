@@ -44,23 +44,23 @@ arcpy.CheckOutExtension('GeoStats')
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
     'bool_air_temperature': False, 
     'bool_vapor_pressure': False, 
-    'to_date': u'2014-01-13 12:00:00', 
+    'to_date': u'2008-01-04 20:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
-    'from_date': u'2014-01-13 11:00:00', 
+    'from_date': u'2008-01-04 19:00:00', 
     'bool_solar_radiation': False, 
     'bool_all_tools': False, 
     'h20_constant': 0.2, 
     'db': 'jd_data', 
     'bool_dew_point': False, 
-    'bool_precip_mass': False, 
+    'bool_precip_mass': True, 
     'bool_wind_speed': False, 
-    'kriging_method': u'Detrended', 
-    'bool_thermal_radiation': True, 
+    'kriging_method': u'Empirical Bayesian', 
+    'bool_thermal_radiation': False, 
     'bool_constants': False, 
     'bool_snow_properties': False, 
-    'watershed': u'Johnston Draw', 
+    'watershed': u'Reynolds Creek', 
     'bool_snow_depth': False, 
     'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
     }
@@ -134,29 +134,43 @@ def ConnectDB(db):
     else:
         arcpy.AddMessage('Connection successful')
 
-def ParameterList(param_dict, rows):
+def ParameterList(param_dict, rows, table_type):
     '''Append all data to the end of the parameter list'''
     count = rows.rowcount
-    for i in range(0, count):
-        row = rows.fetchone()
-        if data['watershed'] == 'Johnston Draw':
-            param_dict['site_key'].append(row[0])
-            param_dict['date_time'].append(row[1])
-            param_dict['air_temperature'].append(row[8])
-            param_dict['vapor_pressure'].append(row[10])
-            param_dict['dew_point'].append(row[11])
-            param_dict['solar_radiation'].append(row[12])
-            param_dict['wind_speed'].append(row[13])
-            param_dict['wind_direction'].append(row[14])
-        elif data['watershed'] == 'Reynolds Creek':
-            param_dict['site_key'].append(row[0])
-            param_dict['date_time'].append(row[1])
-            param_dict['air_temperature'].append(row[9])
-            param_dict['vapor_pressure'].append(row[11])
-            param_dict['dew_point'].append(row[12])
-            param_dict['solar_radiation'].append(row[13])
-            param_dict['wind_speed'].append(row[14])
-            param_dict['wind_direction'].append(row[15])
+    if table_type == 'climate':
+        for i in range(0, count):
+            row = rows.fetchone()
+            if data['watershed'] == 'Johnston Draw':
+                param_dict['site_key'].append(row[0])
+                param_dict['date_time'].append(row[1])
+                param_dict['air_temperature'].append(row[8])
+                param_dict['vapor_pressure'].append(row[10])
+                param_dict['dew_point'].append(row[11])
+                param_dict['solar_radiation'].append(row[12])
+                param_dict['wind_speed'].append(row[13])
+                param_dict['wind_direction'].append(row[14])
+            elif data['watershed'] == 'Reynolds Creek':
+                param_dict['site_key'].append(row[0])
+                param_dict['date_time'].append(row[1])
+                param_dict['air_temperature'].append(row[9])
+                param_dict['vapor_pressure'].append(row[11])
+                param_dict['dew_point'].append(row[12])
+                param_dict['solar_radiation'].append(row[13])
+                param_dict['wind_speed'].append(row[14])
+                param_dict['wind_direction'].append(row[15])
+    elif table_type == 'precip':
+        for i in range(0,count):
+            row = rows.fetchone()
+            if data['watershed'] == 'Johnston Draw':
+                param_dict['site_key'].append(row[0])
+                param_dict['ppts'].append(row[2])
+                param_dict['pptu'].append(row[3])
+                param_dict['ppta'].append(row[4])
+            elif data['watershed'] == 'Reynolds Creek':
+                param_dict['site_key'].append(row[0])
+                param_dict['ppts'].append(row[2])
+                param_dict['pptu'].append(row[3])
+                param_dict['ppta'].append(row[4])
     return param_dict
 
 def BuildClimateTable(params, num):
@@ -635,6 +649,45 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
     
     return out_file
 
+def PrecipitationMass(precip_tab, date_stamp):
+    print('Precipitation mass')
+    param = 'ppts'
+    out_raster_title = 'm_pp'
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_raster_title, date_stamp)
+    scratch_table = DataTable(param, precip_tab)
+    
+    if data['watershed'] == 'Johnston Draw':
+        cursor = arcpy.SearchCursor(scratch_table)
+        print precip_tab
+        x = []
+        y = []
+        for row in cursor:
+            x.append(row.getValue('RASTERVALU'))
+            y.append(row.getValue('MEAN_ppts'))
+        del cursor
+        del row
+    
+        A = numpy.vstack([x,numpy.ones(len(x))]).T
+        slope, intercept = numpy.linalg.lstsq(A, y)[0]
+        arcpy.AddMessage('Slope {0}, Intercept {1}'.format(slope, intercept))
+        if slope != 0.0 and intercept != 0.0:
+            #Create final raster
+            arcpy.env.extent = data['ext_elev']
+            raster = (Raster(data['dem']) * slope + intercept)
+            raster.save(out_raster_name)
+            return out_raster_name
+        else: 
+            return
+    else:
+        raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+         
+        #Delete tempStations when done
+        arcpy.management.Delete(scratch_table)
+        return raster
+
+def SoilTemperature(soil_tab, date_stamp):
+    print('Soil Temperature')
+
 def DeleteScratchData(in_list):
     for path in in_list:
         #print path
@@ -720,9 +773,9 @@ def main():
             cur.execute(query)
             i_num_return = cur.rowcount
             print('Query: ' + query)
-            print('Row Count: ' + str(i_num_return))
+            print('Row Count: {0}'.format(i_num_return))
             #Build parameter lists into dictionary
-            parameters = ParameterList(parameters, cur)
+            parameters = ParameterList(parameters, cur, table_type = 'climate')
             cur.close()
             
             # Build Climate table
@@ -755,8 +808,7 @@ def main():
                 cur2.execute(sQuery2)
                 d_ref_temp = cur2.fetchone()[0]
                 cur2.close()
-                path_air_temp = r'C:\Users\chaptuck\AppData\Local\Temp\scratch\Output_201521Oct_151135\T_a_20140113_11.tif'
-                path_vapor_pressure = r'C:\Users\chaptuck\AppData\Local\Temp\scratch\Output_201521Oct_151135\e_a_20140113_11.tif'
+                
                 path_thermal_radiation = ThermalRadiation(climate_table, 
                         time_stamp, 
                         path_air_temp, 
@@ -764,8 +816,38 @@ def main():
                         d_ref_temp)
 
             DeleteScratchData(ls_scratch_data_imd)
-        
-        
+        if any([data['bool_all_tools'], data['bool_precip_mass']]):
+            # Run climate data 
+            ls_scratch_data_imd = []
+            
+            # Initiate parameter lists
+            parameters = {'site_key' : [],
+                    'ppts' : [],
+                    'pptu' : [],
+                    'ppta' : []}
+
+            # Query precip table
+            from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
+            time_stamp = date_increment.strftime('%Y%m%d_%H')
+            to_date_temp = date_increment + delta
+            to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
+            query = ('SELECT * FROM precipitation WHERE '\
+                    'date_time >= "' + from_date + '" '\
+                    'AND date_time < "' + to_date + '"')
+            cur = db_cnx.cursor()
+            cur.execute(query)
+            i_num_return = cur.rowcount
+            print('Query: ' + query)
+            print('Row Count:'.format(i_num_return))
+            parameters = ParameterList(parameters, cur, table_type = 'precip')
+            cur.close()
+            
+            precip_table = BuildClimateTable(parameters, i_num_return)
+            ls_scratch_data_imd.append(precip_table)
+
+            if data['bool_precip_mass']:
+                path_precip_mass = PrecipitationMass(precip_table, time_stamp)
+            
         date_increment += delta
     DeleteScratchData(ls_scratch_data)
 
