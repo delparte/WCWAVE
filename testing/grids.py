@@ -179,6 +179,12 @@ def ParameterList(param_dict, rows, table_type):
             if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek':
                 param_dict['site_key'].append(row[0])
                 param_dict['stm005'].append(row[3]) # column 3 is soil temp at 5 cm depth
+    elif table_type == 'snow_depth':
+        for i in range(0,count):
+            row = rows.fetchone()
+            if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek':
+                param_dict['site_key'].append(row[0])
+                param_dict['zs'].append(row[8])
     return param_dict
 
 def BuildClimateTable(params, num):
@@ -445,6 +451,35 @@ def Krig(parameter, scratch_table, date_stamp, out_name):
         raster = EBKMethod(parameter, scratch_table, date_stamp, out_name)
     return raster
 
+def OLS(parameter, scratch_table, date_stamp, out_name):
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_name, date_stamp)
+    #Run ordinary least squares on scratch_table
+    coef_table = arcpy.management.CreateTable(data['scratch_gdb'], 'coef_table')
+    
+    arcpy.management.AddField(in_table = scratch_table,
+            field_name = 'Unique_ID',
+            field_type = 'SHORT',
+            field_is_nullable = 'NULLABLE',
+            field_is_required = 'NON_REQUIRED')
+    arcpy.management.CalculateField(in_table = scratch_table,
+        field = 'Unique_ID',
+        expression = '!OBJECTID!',
+        expression_type = 'PYTHON_9.3')
+    
+    ols = arcpy.stats.OrdinaryLeastSquares(Input_Feature_Class = scratch_table,
+            Unique_ID_Field = 'Unique_ID',
+            Output_Feature_Class = 'in_memory/fcResid',
+            Dependent_Variable = 'MEAN_' + parameter,
+            Explanatory_Variables = 'RASTERVALU',
+            Coefficient_Output_Table = coef_table)
+    intercept = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[0]
+    slope = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[1]
+    
+    arcpy.env.extent = data['ext_elev']
+    return_raster = arcpy.Raster(data['dem']) * slope + intercept
+    return_raster.save(out_raster_name)
+    return out_raster_name
+
 def AirTemperature(clim_tab, date_stamp):
     print('Air Temperature')
     param = 'air_temperature'
@@ -709,6 +744,31 @@ def SoilTemperature(soil_tab, date_stamp):
     arcpy.management.Delete(scratch_table)
     return raster
     
+def SnowDepth(snow_tab, date_stamp):
+    print('Snow depth')
+    param = 'zs'
+    out_raster_title = 'zs'
+    scratch_table = DataTable(param, snow_tab)
+    
+    cursor = arcpy.SearchCursor(scratch_table)
+    values = []
+    for row in cursor:
+        values.append(row.getValue('MEAN_zs'))
+    del cursor
+    del row
+    average = numpy.mean(values)
+    count = int(arcpy.management.GetCount(scratch_table).getOutput(0))
+    if count >= 10 and average > 0:
+        raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+    else:
+        if count < 10: 
+            arcpy.AddMessage('Not enough data for snow depth. Try a different time step.')
+        if average == 0:
+            arcpy.AddMessage('No snow on the ground. Try a different time step if needed.')
+    
+    arcpy.management.Delete(scratch_table)
+    return raster
+
 
 def DeleteScratchData(in_list):
     for path in in_list:
@@ -900,6 +960,37 @@ def main():
                 path_soil_temp = SoilTemperature(soil_table, time_stamp)
             DeleteScratchData(ls_scratch_data_imd)
         date_increment += delta
+    
+    #Run initial condition functions once
+    from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
+    time_stamp = date_increment.strftime('%Y%m%d_%H')
+    to_date_temp = date_increment + delta
+    to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S') 
+    
+    if any([data['bool_all_tools'], data['bool_snow_depth']]):
+        ls_scratch_data_imd = []
+        #Initiate parameter dict
+        parameters = {'site_key': [],
+                'zs': []
+                }
+        query = ('SELECT * FROM snow_depth WHERE '\
+                'date_time >= "' + from_date + '" '\
+                'AND date_time < "' + to_date + '"')
+        cur = db_cnx.cursor()
+        cur.execute(query)
+        i_num_return = cur.rowcount
+        print('Query: ' + query)
+        print('Row Count: {0}'.format(i_num_return))
+        #Build parameter lists into dictionary
+        parameters = ParameterList(parameters, cur, table_type = 'snow_depth')
+        cur.close()
+        #Build Climate table
+        snow_table = BuildClimateTable(parameters, i_num_return)
+        ls_scratch_data_imd.append(snow_table)
+        #Run gridding function
+        if data['bool_snow_depth']:
+            path_snow_depth = SnowDepth(snow_table, time_stamp)
+        DeleteScratchData(ls_scratch_data_imd)    
     DeleteScratchData(ls_scratch_data)
 
 if __name__ == '__main__':
