@@ -769,6 +769,66 @@ def SnowDepth(snow_tab, date_stamp):
     arcpy.management.Delete(scratch_table)
     return raster
 
+def SnowCoverTemperature(date_stamp):
+    print 'Upper Layer'
+    ul_param = 'T_s_0'
+    avg_param = 'T_s'
+    ul_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], ul_param, date_stamp)
+    avg_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], avg_param, date_stamp)
+    
+    if len(data['ul_interp_values']['features']) <= 1:
+        upper_layer_temperature = -0.0008 * Raster(data['dem']) + 0.1053
+        upper_layer_temperature.save(ul_raster_name)
+    else:
+        ls_elevation = []
+        ls_temperature = []
+        for rec in data['ul_interp_values']['features']:
+            ls_elevation.append(rec['attributes']['Elevation'])
+            ls_density.append(rec['attributes']['Temperature'])
+        lr_results = stats.linregress(ls_elevation, ls_density)
+        slope_ul = lr_results[0]
+        intercept_ul = lr_results[1]
+        upper_layer_temperature = slope_ul * Raster(data['dem']) + intercept_ul
+        upper_layer_temperature.save(ul_raster_name)
+    if len(data['ll_interp_values']['features']) <=1:
+        lower_layer_temperature = -0.0008 * Raster(data['dem']) + 1.3056
+    else:
+        ls_elevation = []
+        ls_temperature = []
+        for rec in data['ll_interp_values']['features']:
+            ls_elevation.append(rec['attributes']['Elevation'])
+            ls_temperature.append(rec['attributes']['Temperature'])
+    
+        lr_results = stats.linregress(ls_elevation, ls_temperature)
+        slope_ll = lr_results[0]
+        intercept_ll = lr_results[1]
+        lower_layer_temperature = slope_ll * Raster(data['dem']) + intercept_ll
+     
+    #average snowcover temperature is the average of the upper and lower layer temperatures
+    avg_sc_temp = arcpy.sa.CellStatistics([upper_layer_temperature, lower_layer_temperature], 'MEAN', 'NODATA')
+    avg_sc_temp.save(avg_raster_name)
+    return ul_raster_name, avg_raster_name
+    
+def SnowDensityInterpolation(date_stamp):
+    print 'Snow Density Interpolation'
+    param = 'rho'
+    out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], param, date_stamp)
+    if len(data['density_interp_values']['features']) <= 1:
+        snow_density_raster = -0.0395 * Raster(data['dem']) + 405.26
+        snow_density_raster.save(out_raster_name)
+    else: # This will not work until we get scypy loaded
+        ls_elevation = []
+        ls_density = []
+        for rec in data['density_interp_values']['features']:
+            ls_elevation.append(rec['attributes']['Elevation'])
+            ls_density.append(rec['attributes']['Density'])
+        lr_results = stats.linregress(ls_elevation, ls_density)
+        slope = lr_results[0]
+        intercept = lr_results[1]
+        snow_density_raster = slope * Raster(data['dem']) + intercept
+        snow_density_raster.save(out_raster_name)
+    return out_raster_name
+
 
 def DeleteScratchData(in_list):
     for path in in_list:
@@ -991,6 +1051,10 @@ def main():
         if data['bool_snow_depth']:
             path_snow_depth = SnowDepth(snow_table, time_stamp)
         DeleteScratchData(ls_scratch_data_imd)    
+    if data['bool_snow_properties']:
+        print('snow Properties')
+        path_ul_snow_temperature, path_avg_snow_temperature = SnowCoverTemperature(time_stamp)
+        path_snow_density = SnowDensityInterpolation(time_stamp)
     DeleteScratchData(ls_scratch_data)
 
 if __name__ == '__main__':
