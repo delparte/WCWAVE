@@ -829,6 +829,22 @@ def SnowDensityInterpolation(date_stamp):
         snow_density_raster.save(out_raster_name)
     return out_raster_name
 
+def Constants(rl, h2o, date_stamp):
+    print('Constants')
+    rl_param = 'z_0'
+    h2o_param = 'h2o_sat'
+    rl_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'],rl_param,date_stamp)
+    h2o_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'],h2o_param,date_stamp)
+    desc = arcpy.Describe(data['dem'])
+    coord_system = desc.spatialReference
+    rl_constant = CreateConstantRaster(rl, 'FLOAT', data['output_cell_size'])
+    arcpy.management.DefineProjection(rl_constant, coord_system)
+    rl_constant.save(rl_raster_name)
+    h2o_constant = CreateConstantRaster(h2o, 'FLOAT', data['output_cell_size'])
+    arcpy.management.DefineProjection(h2o_constant, coord_system)
+    h2o_constant.save(h2o_raster_name)
+    
+    return rl_raster_name, h2o_raster_name
 
 def DeleteScratchData(in_list):
     for path in in_list:
@@ -1055,6 +1071,9 @@ def main():
         print('snow Properties')
         path_ul_snow_temperature, path_avg_snow_temperature = SnowCoverTemperature(time_stamp)
         path_snow_density = SnowDensityInterpolation(time_stamp)
+    if data['bool_constants']:
+        path_rl_constant, path_h2o_constant = Constants(data['rl_constant'], data['h2o_constant'], time_stamp)
+
     DeleteScratchData(ls_scratch_data)
 
 if __name__ == '__main__':
