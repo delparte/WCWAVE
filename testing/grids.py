@@ -27,13 +27,14 @@ arcpy.CheckOutExtension('GeoStats')
 ##     'bool_air_temperature' : arcpy.GetParameter(6),
 ##     'bool_constants' : arcpy.GetParameter(7),
 ##     'rl_constant' : arcpy.GetParameter(8),
-##     'h20_constant' : arcpy.GetParameter(9),
+##     'h2o_constant' : arcpy.GetParameter(9),
 ##     'bool_dew_point' : arcpy.GetParameter(10),
 ##     'bool_precip_mass' : arcpy.GetParameter(11),
 ##     'bool_snow_depth' : arcpy.GetParameter(12),
 ##     'bool_snow_properties' : arcpy.GetParameter(13),
 ##     'll_interp_values' : json.loads(arcpy.GetParameter(14).JSON),
 ##     'ul_interp_values' : json.loads(arcpy.GetParameter(15).JSON),
+##     'density_interp_values' : json.loads(arcpy.GetParameter(16).JSON),
 ##     'bool_soil_temperature' : arcpy.GetParameter(17),
 ##     'bool_solar_radiation' : arcpy.GetParameter(18),
 ##     'bool_thermal_radiation' : arcpy.GetParameter(19),
@@ -42,25 +43,26 @@ arcpy.CheckOutExtension('GeoStats')
 ## }
 
 data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
+    'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
     'bool_air_temperature': False, 
     'bool_vapor_pressure': False, 
-    'to_date': u'2008-01-04 20:00:00', 
+    'to_date': u'2014-01-04 13:00:00', 
     'time_step': 1, 
     'bool_soil_temperature': False, 
     'rl_constant': 0.005, 
-    'from_date': u'2008-01-04 19:00:00', 
+    'from_date': u'2014-01-04 12:00:00', 
     'bool_solar_radiation': False, 
     'bool_all_tools': False, 
-    'h20_constant': 0.2, 
+    'h2o_constant': 0.2, 
     'db': 'jd_data', 
     'bool_dew_point': False, 
-    'bool_precip_mass': True, 
+    'bool_precip_mass': False, 
     'bool_wind_speed': False, 
     'kriging_method': u'Empirical Bayesian', 
     'bool_thermal_radiation': False, 
-    'bool_constants': False, 
+    'bool_constants': True, 
     'bool_snow_properties': False, 
-    'watershed': u'Reynolds Creek', 
+    'watershed': u'Johnston Draw', 
     'bool_snow_depth': False, 
     'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
     }
@@ -171,6 +173,12 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['ppts'].append(row[2])
                 param_dict['pptu'].append(row[3])
                 param_dict['ppta'].append(row[4])
+    elif table_type == 'soil_temperature':
+        for i in range(0,count):
+            row = rows.fetchone()
+            if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek':
+                param_dict['site_key'].append(row[0])
+                param_dict['stm005'].append(row[3]) # column 3 is soil temp at 5 cm depth
     return param_dict
 
 def BuildClimateTable(params, num):
@@ -247,17 +255,21 @@ def DataTable(parameter, data_table, thermal_fields = []):
     
     # Delete rows from feature class that have negative or null elevations
     cursor = arcpy.UpdateCursor(temp_stations)
-    for row in cursor:
-        if (row.getValue('RASTERVALU') < 0 or
-                row.getValue('RASTERVALU') == 'None' or
-                row.getValue('RASTERVALU') is None ):
-            cursor.deleteRow(row)
-        else:
-            row.setValue('RASTERVALU', round(row.getValue('RASTERVALU'), 2))
-            cursor.updateRow(row)
+    if parameter == 'stm005':
+        print('Soil temperature')
+        arcpy.env.extent = data['ext_features'] 
+    else:
+        for row in cursor:
+            if (row.getValue('RASTERVALU') < 0 or
+                    row.getValue('RASTERVALU') == 'None' or
+                    row.getValue('RASTERVALU') is None ):
+                cursor.deleteRow(row)
+            else:
+                row.setValue('RASTERVALU', round(row.getValue('RASTERVALU'), 2))
+                cursor.updateRow(row)
 
-    del cursor
-    del row
+        del cursor
+        del row
     # Delete rows from feature class that have null values for paramter
     cursor = arcpy.UpdateCursor(temp_stations)
     if len(thermal_fields) > 0:
@@ -687,6 +699,16 @@ def PrecipitationMass(precip_tab, date_stamp):
 
 def SoilTemperature(soil_tab, date_stamp):
     print('Soil Temperature')
+    param = 'stm005'
+    out_raster_title = 'T_g'
+    #Create Scratch Table -- 
+    # this is different from the rest in that it does not delete no elevation 
+    scratch_table = DataTable(param, soil_tab)
+    
+    raster = OLS(param, scratch_table, date_stamp, out_raster_title)
+    arcpy.management.Delete(scratch_table)
+    return raster
+    
 
 def DeleteScratchData(in_list):
     for path in in_list:
@@ -825,7 +847,7 @@ def main():
                     'ppts' : [],
                     'pptu' : [],
                     'ppta' : []}
-
+            
             # Query precip table
             from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
             time_stamp = date_increment.strftime('%Y%m%d_%H')
@@ -844,10 +866,39 @@ def main():
             
             precip_table = BuildClimateTable(parameters, i_num_return)
             ls_scratch_data_imd.append(precip_table)
-
+            
             if data['bool_precip_mass']:
                 path_precip_mass = PrecipitationMass(precip_table, time_stamp)
+            DeleteScratchData(ls_scratch_data_imd)
+        if any([data['bool_all_tools'], data['bool_soil_temperature']]):
+            ls_scratch_data_imd = []
             
+            parameters = {'site_key': [],
+                    'stm005': []}
+            
+            #Query soil temperature table
+            # Query precip table
+            from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
+            time_stamp = date_increment.strftime('%Y%m%d_%H')
+            to_date_temp = date_increment + delta
+            to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
+            query = ('SELECT * FROM soil_temperature WHERE '\
+                    'date_time >= "' + from_date + '" '\
+                    'AND date_time < "' + to_date + '"')
+            cur = db_cnx.cursor()
+            cur.execute(query)
+            i_num_return = cur.rowcount
+            print('Query: ' + query)
+            print('Row Count:'.format(i_num_return))
+            parameters = ParameterList(parameters, cur, table_type = 'soil_temperature')
+            cur.close()
+            
+            soil_table = BuildClimateTable(parameters, i_num_return)
+            ls_scratch_data_imd.append(soil_table)
+            
+            if data['bool_soil_temperature']:
+                path_soil_temp = SoilTemperature(soil_table, time_stamp)
+            DeleteScratchData(ls_scratch_data_imd)
         date_increment += delta
     DeleteScratchData(ls_scratch_data)
 
