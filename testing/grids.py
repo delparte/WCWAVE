@@ -57,10 +57,10 @@ data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Tem
     'db': 'jd_data', 
     'bool_dew_point': False, 
     'bool_precip_mass': False, 
-    'bool_wind_speed': False, 
+    'bool_wind_speed': True, 
     'kriging_method': u'Empirical Bayesian', 
     'bool_thermal_radiation': False, 
-    'bool_constants': True, 
+    'bool_constants': False, 
     'bool_snow_properties': False, 
     'watershed': u'Johnston Draw', 
     'bool_snow_depth': False, 
@@ -215,17 +215,23 @@ def BuildClimateTable(params, num):
     del row
     return table
 
-def DataTable(parameter, data_table, thermal_fields = []):
+def DataTable(parameter, data_table, multi_fields = []):
     ''' Create paramater scratch table to be used for interpolation '''
     scratch_data = []
     temp_table1 = parameter + '_table'
     temp_table2 = 'in_memory/' + parameter + '_table2'
-    if len(thermal_fields) > 0:
+    if len(multi_fields) == 2: #Simplify these checks somehow
         #Thermal radation stats_fields 
         #  format - [['air_temperature', 'MEAN'], ['vapor_pressure', 'MEAN']]
         stats_fields = [] 
-        clause = thermal_fields[0] + ' > -500 AND ' + thermal_fields[1] + ' > -500'
-        for l in thermal_fields:
+        clause = '{0} > -500 AND {1} > -500'.format(multi_fields[0], multi_fields[1]) 
+        for l in multi_fields:
+            stats_fields.append([l, 'MEAN'])
+    elif len(multi_fields) == 3:
+        # Wind speed
+        stats_fields = []
+        clause = '{0} > -500 AND {1} > -500 AND {2} > -500'.format(multi_fields[0], multi_fields[1], multi_fields[2])
+        for l in multi_fields:
             stats_fields.append([l, 'MEAN'])
     else: # regular parameters
         stats_fields = parameter + ' MEAN'
@@ -243,9 +249,9 @@ def DataTable(parameter, data_table, thermal_fields = []):
     temp_stations = arcpy.management.CopyFeatures(in_features = data['fc_stations_elev'],
             out_feature_class = data['scratch_gdb'] + '/tempStations')
     # Join stats to temp stations feature class
-    if len(thermal_fields) > 0: #Thermal radiation
+    if len(multi_fields) > 0: #Thermal radiation and wind speed
         tr_fields = []
-        for l in thermal_fields:
+        for l in multi_fields:
             tr_fields.append('MEAN_' + l)
         arcpy.management.JoinField(in_data = temp_stations,
                 in_field = 'Site_key',
@@ -278,12 +284,18 @@ def DataTable(parameter, data_table, thermal_fields = []):
         del row
     # Delete rows from feature class that have null values for paramter
     cursor = arcpy.UpdateCursor(temp_stations)
-    if len(thermal_fields) > 0:
-        #thermal Radiation check
+    if len(multi_fields) == 2: #thermal Radiation check
         for row in cursor:
-            val0 = 'MEAN_' + thermal_fields[0]
-            val1 = 'MEAN_' + thermal_fields[1]
+            val0 = 'MEAN_' + multi_fields[0]
+            val1 = 'MEAN_' + multi_fields[1]
             if row.isNull(val0) or row.isNull(val1):
+                cursor.deleteRow(row)
+    if len(multi_fields) == 3: # Wind speed
+        for row in cursor:
+            val0 = 'MEAN_' + multi_fields[0]
+            val1 = 'MEAN_' + multi_fields[1]
+            val2 = 'MEAN_' + multi_fields[2]
+            if row.isNull(val0) or row.isNull(val1) or row.isNull(val2):
                 cursor.deleteRow(row)
     else:
         for row in cursor:
@@ -441,7 +453,7 @@ def CombinedMethod(parameter, data_table, date_stamp, out_ras):
     return out_raster_name
 
 def Krig(parameter, scratch_table, date_stamp, out_name):
-    #Interpolate using the chosen method
+    '''Interpolate using the chosen method'''
     if data['kriging_method'] == 'Detrended':
         raster = DetrendedMethod(parameter, scratch_table, date_stamp, out_name)
         #raster.save(data['out_folder'] + '/' + param + '.tif')
@@ -629,7 +641,7 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
     vp = in_vap
     
     fields = ['air_temperature', 'vapor_pressure']
-    scratch_table = DataTable(param, clim_tab, thermal_fields=fields)
+    scratch_table = DataTable(param, clim_tab, multi_fields=fields)
     P_m = 0.0
     T_m = 0.0
     z_m = 0.0
@@ -846,6 +858,104 @@ def Constants(rl, h2o, date_stamp):
     
     return rl_raster_name, h2o_raster_name
 
+def WindSpeed(clim_tab, date_stamp, in_date_time):
+    print('Wind Speed')
+    scratch_data = []
+    param = 'wind_speed'
+    out_raster_title = 'u'
+    out_file = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_raster_title, date_stamp)
+    
+    fields = ['wind_speed', 'wind_direction', 'air_temperature']
+    scratch_table = DataTable(param, clim_tab, multi_fields=fields)
+     
+    ninja_path = 'C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe'
+    wind_date = in_date_time.split(" ")[0]
+    wind_time = in_date_time.split(" ")[1]
+    ls_wind_date = wind_date.split("-")
+    ls_wind_time = wind_time.split(":")
+    wind_year = ls_wind_date[0]
+    wind_month = ls_wind_date[1]
+    wind_day = ls_wind_date[2]
+    wind_hour = ls_wind_time[0]
+    wind_minute = ls_wind_time[1]
+     
+    #Build station csv file from SQL data
+    # Add coordinates to station feature class
+    arcpy.management.AddGeometryAttributes(scratch_table, 'POINT_X_Y_Z_M')
+    #Loop through stations in station feature class and write parameter values to a csv file
+    csv_filename = data['scratch_ws'] + '/wn_stations.csv'
+    with open(csv_filename, 'wb') as csvFile:
+        a = csv.writer(csvFile)
+        a.writerow(['Station_Name', 'Coord_Sys(PROJCS,GEOGCS)', 'Datum(WGS84,NAD83,NAD27)',
+            'Lat/YCoord', 'Lon/XCoord', 'Height', 'Height_Units(meters,feet)', 'Speed',
+            'Speed_Units(mph,kph,mps)', 'Direction(degrees)', 'Temperature', 
+            'Temperature_Units(F,C)', 'Cloud_Cover(%)', 'Radius_of_Influence', 
+            'Radius_of_Influence_Units(miles,feet,meters,km)'])
+        cursor = arcpy.SearchCursor(scratch_table)
+        for row in cursor:
+            a.writerow([row.getValue("Site_Key"), 'PROJCS', 'NAD83', row.getValue("Point_Y"), 
+                row.getValue("Point_X"), '3', 'meters', row.getValue("MEAN_wind_speed"),
+                'mps', row.getValue("MEAN_wind_direction"), row.getValue("MEAN_air_temperature"), 
+                'C', '0', '-1', 'miles'])
+    csvFile.close()
+    #List arguments for WindNinja CLI
+    args = []
+    args = [ninja_path,
+    "--initialization_method", "pointInitialization",
+    "--elevation_file", data['elev_tiff'], #elevation raster (cannot contain any "no-data" values)
+    "--match_points", "false", #match simulations to points (simulation fails if set to true)
+    "--year", wind_year,
+    "--month", wind_month,
+    "--day", wind_day,
+    "--hour", wind_hour,
+    "--minute", wind_minute,
+    "--mesh_resolution", data['output_cell_size'], #Resolution of model calculations
+    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
+    "--time_zone", "America/Boise", #time zone of target simulation
+    "--diurnal_winds", "true", #consider diurnal cycles in calculations
+    "--write_goog_output", "false", #write kml output (boolean: true/false)
+    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
+    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
+    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
+    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
+    "--units_ascii_out_resolution", "m",
+    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
+    "--units_output_wind_height", "m", #units of output wind height
+    "--output_speed_units", "mps",
+    "--output_wind_height", "3",
+    "--wx_station_filename", csv_filename, #weather station csv file used in point initialization method
+    "--output_path", data['scratch_ws']] #path to output
+        
+    #run the WindNinja_cli.exe (output is written to the same location as elevatoin raster)
+    arcpy.AddMessage('Calling WindNinja command line interface')
+    runfile = subprocess.Popen(args, stdout = subprocess.PIPE, bufsize = -1)
+    runfile.wait()
+    output = runfile.stdout.read()
+    if output is None:
+        arcpy.AddMessage('Results: None returned\n')
+    else:
+        arcpy.AddMessage('Results:\n' + output)
+    #convert ascii file to new grid
+    for file in os.listdir(data['scratch_ws']):
+        if file.endswith('_vel.asc'):
+            path_2_ascii = '{0}/{1}'.format(data['scratch_ws'], file)
+            scratch_data.append(path_2_ascii)
+        elif ( file.endswith("_vel.prj") or file.endswith('_ang.asc') or
+               file.endswith('_ang.prj') or file.endswith('cld.asc') or 
+               file.endswith('_cld.prj') ):
+            scratch_data.append(data['scratch_ws'] + '/' + file)
+    arcpy.conversion.ASCIIToRaster(in_ascii_file=path_2_ascii,
+            out_raster=out_file,
+            data_type='FLOAT')
+    #Get coordinate system information
+    desc = arcpy.Describe(data['dem'])
+    coord_system = desc.spatialReference
+    arcpy.management.DefineProjection(out_file, coord_system)
+
+    DeleteScratchData(scratch_data)
+
+    return out_file
+
 def DeleteScratchData(in_list):
     for path in in_list:
         #print path
@@ -949,7 +1059,7 @@ def main():
             if data['bool_vapor_pressure']:
                 path_vapor_pressure = VaporPressure(climate_table, time_stamp)
             if data['bool_wind_speed']:
-                path_wind_speed = WindSpeed()
+                path_wind_speed = WindSpeed(climate_table, time_stamp, from_date)
             if data['bool_solar_radiation']:
                 path_solar_radiation = SolarRadiation(climate_table,
                             time_stamp, 
@@ -1073,6 +1183,8 @@ def main():
         path_snow_density = SnowDensityInterpolation(time_stamp)
     if data['bool_constants']:
         path_rl_constant, path_h2o_constant = Constants(data['rl_constant'], data['h2o_constant'], time_stamp)
+    
+    db_cnx.close()
 
     DeleteScratchData(ls_scratch_data)
 
