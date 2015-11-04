@@ -18,54 +18,54 @@ arcpy.CheckOutExtension('Spatial')
 arcpy.CheckOutExtension('GeoStats')
 
 #Dictionary to hold all user input data.  
-## data = {'watershed' : arcpy.GetParameterAsText(0),
-##     'from_date' : arcpy.GetParameterAsText(1),
-##     'to_date' : arcpy.GetParameterAsText(2),
-##     'time_step' : int(arcpy.GetParameterAsText(3)),
-##     'kriging_method' : arcpy.GetParameterAsText(4),
-##     'bool_all_tools' : arcpy.GetParameter(5),
-##     'bool_air_temperature' : arcpy.GetParameter(6),
-##     'bool_constants' : arcpy.GetParameter(7),
-##     'rl_constant' : arcpy.GetParameter(8),
-##     'h2o_constant' : arcpy.GetParameter(9),
-##     'bool_dew_point' : arcpy.GetParameter(10),
-##     'bool_precip_mass' : arcpy.GetParameter(11),
-##     'bool_snow_depth' : arcpy.GetParameter(12),
-##     'bool_snow_properties' : arcpy.GetParameter(13),
-##     'll_interp_values' : json.loads(arcpy.GetParameter(14).JSON),
-##     'ul_interp_values' : json.loads(arcpy.GetParameter(15).JSON),
-##     'density_interp_values' : json.loads(arcpy.GetParameter(16).JSON),
-##     'bool_soil_temperature' : arcpy.GetParameter(17),
-##     'bool_solar_radiation' : arcpy.GetParameter(18),
-##     'bool_thermal_radiation' : arcpy.GetParameter(19),
-##     'bool_vapor_pressure' : arcpy.GetParameter(20),
-##     'bool_wind_speed' : arcpy.GetParameter(21)
-## }
-
-data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
-    'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
-    'bool_air_temperature': False, 
-    'bool_vapor_pressure': False, 
-    'to_date': u'2014-01-04 13:00:00', 
-    'time_step': 1, 
-    'bool_soil_temperature': False, 
-    'rl_constant': 0.005, 
-    'from_date': u'2014-01-04 12:00:00', 
-    'bool_solar_radiation': False, 
-    'bool_all_tools': False, 
-    'h2o_constant': 0.2, 
-    'db': 'jd_data', 
-    'bool_dew_point': False, 
-    'bool_precip_mass': False, 
-    'bool_wind_speed': True, 
-    'kriging_method': u'Empirical Bayesian', 
-    'bool_thermal_radiation': False, 
-    'bool_constants': False, 
-    'bool_snow_properties': False, 
-    'watershed': u'Johnston Draw', 
-    'bool_snow_depth': False, 
-    'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
-    }
+data = {'watershed' : arcpy.GetParameterAsText(0),
+    'from_date' : arcpy.GetParameterAsText(1),
+    'to_date' : arcpy.GetParameterAsText(2),
+    'time_step' : int(arcpy.GetParameterAsText(3)),
+    'kriging_method' : arcpy.GetParameterAsText(4),
+    'bool_all_tools' : arcpy.GetParameter(5),
+    'bool_air_temperature' : arcpy.GetParameter(6),
+    'bool_constants' : arcpy.GetParameter(7),
+    'rl_constant' : arcpy.GetParameter(8),
+    'h2o_constant' : arcpy.GetParameter(9),
+    'bool_dew_point' : arcpy.GetParameter(10),
+    'bool_precip_mass' : arcpy.GetParameter(11),
+    'bool_snow_depth' : arcpy.GetParameter(12),
+    'bool_snow_properties' : arcpy.GetParameter(13),
+    'll_interp_values' : json.loads(arcpy.GetParameter(14).JSON),
+    'ul_interp_values' : json.loads(arcpy.GetParameter(15).JSON),
+    'density_interp_values' : json.loads(arcpy.GetParameter(16).JSON),
+    'bool_soil_temperature' : arcpy.GetParameter(17),
+    'bool_solar_radiation' : arcpy.GetParameter(18),
+    'bool_thermal_radiation' : arcpy.GetParameter(19),
+    'bool_vapor_pressure' : arcpy.GetParameter(20),
+    'bool_wind_speed' : arcpy.GetParameter(21)
+}
+## 
+## data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
+##     'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
+##     'bool_air_temperature': True, 
+##     'bool_vapor_pressure': False, 
+##     'to_date': u'2014-01-01 13:00:00', 
+##     'time_step': 1, 
+##     'bool_soil_temperature': False, 
+##     'rl_constant': 0.005, 
+##     'from_date': u'2014-01-01 12:00:00', 
+##     'bool_solar_radiation': False, 
+##     'bool_all_tools': False, 
+##     'h2o_constant': 0.2, 
+##     'db': 'jd_data', 
+##     'bool_dew_point': False, 
+##     'bool_precip_mass': False, 
+##     'bool_wind_speed': False, 
+##     'kriging_method': u'Empirical Bayesian', 
+##     'bool_thermal_radiation': False, 
+##     'bool_constants': False, 
+##     'bool_snow_properties': False, 
+##     'watershed': u'Johnston Draw', 
+##     'bool_snow_depth': False, 
+##     'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
+##     }
 
 #Set up workspaces
 scratchWS = arcpy.env.scratchFolder
@@ -268,7 +268,7 @@ def DataTable(parameter, data_table, multi_fields = []):
     # Delete rows from feature class that have negative or null elevations
     cursor = arcpy.UpdateCursor(temp_stations)
     if parameter == 'stm005':
-        print('Soil temperature')
+        arcpy.AddMessage('Soil temperature')
         arcpy.env.extent = data['ext_features'] 
     else:
         for row in cursor:
@@ -310,7 +310,7 @@ def DataTable(parameter, data_table, multi_fields = []):
     return temp_stations
 
 def DetrendedMethod(parameter, data_table, date_stamp, out_ras):
-    print('Detrended Kriging')
+    arcpy.AddMessage('Detrended Kriging')
     resid_raster = data['scratch_gdb'] + '/' + parameter
     out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_ras, date_stamp)
     # Add unique ID field to temporary data table for use in OLS function
@@ -368,7 +368,7 @@ def DetrendedMethod(parameter, data_table, date_stamp, out_ras):
     return out_raster_name
 
 def EBKMethod(parameter, data_table, date_stamp, out_ras):
-    print('Empirical Bayesian Kriging')
+    arcpy.AddMessage('Empirical Bayesian Kriging')
     scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
     out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_ras, date_stamp)
     arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
@@ -391,7 +391,7 @@ def EBKMethod(parameter, data_table, date_stamp, out_ras):
     return out_raster_name
 
 def CombinedMethod(parameter, data_table, date_stamp, out_ras):
-    print('Combined Method')
+    arcpy.AddMessage('Combined Method')
     scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
     resid_raster = '{0}/{1}_{2}'.format(data['scratch_gdb'], parameter, 'residual')
     out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_ras, date_stamp)
@@ -493,7 +493,7 @@ def OLS(parameter, scratch_table, date_stamp, out_name):
     return out_raster_name
 
 def AirTemperature(clim_tab, date_stamp):
-    print('Air Temperature')
+    arcpy.AddMessage('Air Temperature')
     param = 'air_temperature'
     out_raster_title = 'T_a'
     scratch_table = DataTable(param, clim_tab)
@@ -503,11 +503,11 @@ def AirTemperature(clim_tab, date_stamp):
     raster = Krig(param, scratch_table, date_stamp, out_raster_title)
     
     #Delete tempStations when done.
-    arcpy.management.Delete(scratch_table)
+    #arcpy.management.Delete(scratch_table)
     return raster
 
 def DewPoint(clim_tab, date_stamp):
-    print('Dewpoint Temperature')
+    arcpy.AddMessage('Dewpoint Temperature')
     param = 'dew_point'
     scratch_table = DataTable(param, clim_tab)
     out_raster_title = 'T_pp'
@@ -551,7 +551,7 @@ def SnowDensity(dew_point, date_stamp):
     return outRas
 
 def VaporPressure(clim_tab, date_stamp):
-    print('Vapor Pressure')
+    arcpy.AddMessage('Vapor Pressure')
     param = 'vapor_pressure'
     scratch_table = DataTable(param, clim_tab)
     out_raster_title = 'e_a'
@@ -565,7 +565,7 @@ def VaporPressure(clim_tab, date_stamp):
     return raster
 
 def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
-    print('Solar Radiation')
+    arcpy.AddMessage('Solar Radiation')
     scratch_data = []
     param = 'solar_radiation'
     out_raster_title = 'S_a'
@@ -631,7 +631,7 @@ def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
     return out_raster_name
 
 def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
-    print('Thermal Radiation')
+    arcpy.AddMessage('Thermal Radiation')
     param = 'thermal_radiation'
     out_raster_title = 'I_lw'
     out_file = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_raster_title, date_stamp)
@@ -709,7 +709,7 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
     return out_file
 
 def PrecipitationMass(precip_tab, date_stamp):
-    print('Precipitation mass')
+    arcpy.AddMessage('Precipitation mass')
     param = 'ppts'
     out_raster_title = 'm_pp'
     out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], out_raster_title, date_stamp)
@@ -717,7 +717,6 @@ def PrecipitationMass(precip_tab, date_stamp):
     
     if data['watershed'] == 'Johnston Draw':
         cursor = arcpy.SearchCursor(scratch_table)
-        print precip_tab
         x = []
         y = []
         for row in cursor:
@@ -745,7 +744,7 @@ def PrecipitationMass(precip_tab, date_stamp):
         return raster
 
 def SoilTemperature(soil_tab, date_stamp):
-    print('Soil Temperature')
+    arcpy.AddMessage('Soil Temperature')
     param = 'stm005'
     out_raster_title = 'T_g'
     #Create Scratch Table -- 
@@ -757,7 +756,7 @@ def SoilTemperature(soil_tab, date_stamp):
     return raster
     
 def SnowDepth(snow_tab, date_stamp):
-    print('Snow depth')
+    arcpy.AddMessage('Snow depth')
     param = 'zs'
     out_raster_title = 'zs'
     scratch_table = DataTable(param, snow_tab)
@@ -782,7 +781,7 @@ def SnowDepth(snow_tab, date_stamp):
     return raster
 
 def SnowCoverTemperature(date_stamp):
-    print 'Upper Layer'
+    arcpy.AddMessage('Upper Layer')
     ul_param = 'T_s_0'
     avg_param = 'T_s'
     ul_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], ul_param, date_stamp)
@@ -822,7 +821,7 @@ def SnowCoverTemperature(date_stamp):
     return ul_raster_name, avg_raster_name
     
 def SnowDensityInterpolation(date_stamp):
-    print 'Snow Density Interpolation'
+    arcpy.AddMessage('Snow Density Interpolation')
     param = 'rho'
     out_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'], param, date_stamp)
     if len(data['density_interp_values']['features']) <= 1:
@@ -842,7 +841,7 @@ def SnowDensityInterpolation(date_stamp):
     return out_raster_name
 
 def Constants(rl, h2o, date_stamp):
-    print('Constants')
+    arcpy.AddMessage('Constants')
     rl_param = 'z_0'
     h2o_param = 'h2o_sat'
     rl_raster_name = '{0}/{1}_{2}.tif'.format(data['out_folder'],rl_param,date_stamp)
@@ -859,7 +858,7 @@ def Constants(rl, h2o, date_stamp):
     return rl_raster_name, h2o_raster_name
 
 def WindSpeed(clim_tab, date_stamp, in_date_time):
-    print('Wind Speed')
+    arcpy.AddMessage('Wind Speed')
     scratch_data = []
     param = 'wind_speed'
     out_raster_title = 'u'
@@ -925,7 +924,7 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
     "--output_wind_height", "3",
     "--wx_station_filename", csv_filename, #weather station csv file used in point initialization method
     "--output_path", data['scratch_ws']] #path to output
-        
+       
     #run the WindNinja_cli.exe (output is written to the same location as elevatoin raster)
     arcpy.AddMessage('Calling WindNinja command line interface')
     runfile = subprocess.Popen(args, stdout = subprocess.PIPE, bufsize = -1)
@@ -953,14 +952,13 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
     arcpy.management.DefineProjection(out_file, coord_system)
 
     DeleteScratchData(scratch_data)
-
+    
     return out_file
 
 def DeleteScratchData(in_list):
     for path in in_list:
         #print path
         arcpy.management.Delete(path)
-    arcpy.management.Delete('in_memory')
 
 # Main Function --- Figure out a way to be run as script or as tool
 #======================================================================
@@ -1040,8 +1038,8 @@ def main():
             cur = db_cnx.cursor()
             cur.execute(query)
             i_num_return = cur.rowcount
-            print('Query: ' + query)
-            print('Row Count: {0}'.format(i_num_return))
+            arcpy.AddMessage('Query: ' + query)
+            arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
             #Build parameter lists into dictionary
             parameters = ParameterList(parameters, cur, table_type = 'climate')
             cur.close()
@@ -1071,7 +1069,6 @@ def main():
                 sQuery2 = ("SELECT AVG(NULLIF(" + tmp3 + ", -999)) FROM weather " 
                            "WHERE date_time >= '" + sFromTR + " 00:00:00" + "' " 
                            "AND date_time <= '" + sFromTR + " 23:00:00'")
-                print sQuery2
                 cur2 = db_cnx.cursor()
                 cur2.execute(sQuery2)
                 d_ref_temp = cur2.fetchone()[0]
@@ -1084,6 +1081,7 @@ def main():
                         d_ref_temp)
 
             DeleteScratchData(ls_scratch_data_imd)
+            arcpy.management.Delete('in_memory')
         if any([data['bool_all_tools'], data['bool_precip_mass']]):
             # Run climate data 
             ls_scratch_data_imd = []
@@ -1105,8 +1103,8 @@ def main():
             cur = db_cnx.cursor()
             cur.execute(query)
             i_num_return = cur.rowcount
-            print('Query: ' + query)
-            print('Row Count:'.format(i_num_return))
+            arcpy.AddMessage('Query: ' + query)
+            arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
             parameters = ParameterList(parameters, cur, table_type = 'precip')
             cur.close()
             
@@ -1116,6 +1114,7 @@ def main():
             if data['bool_precip_mass']:
                 path_precip_mass = PrecipitationMass(precip_table, time_stamp)
             DeleteScratchData(ls_scratch_data_imd)
+            arcpy.management.Delete('in_memory')
         if any([data['bool_all_tools'], data['bool_soil_temperature']]):
             ls_scratch_data_imd = []
             
@@ -1134,8 +1133,8 @@ def main():
             cur = db_cnx.cursor()
             cur.execute(query)
             i_num_return = cur.rowcount
-            print('Query: ' + query)
-            print('Row Count:'.format(i_num_return))
+            arcpy.AddMessage('Query: ' + query)
+            arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
             parameters = ParameterList(parameters, cur, table_type = 'soil_temperature')
             cur.close()
             
@@ -1145,6 +1144,7 @@ def main():
             if data['bool_soil_temperature']:
                 path_soil_temp = SoilTemperature(soil_table, time_stamp)
             DeleteScratchData(ls_scratch_data_imd)
+            arcpy.management.Delete('in_memory')
         date_increment += delta
     
     #Run initial condition functions once
@@ -1165,8 +1165,8 @@ def main():
         cur = db_cnx.cursor()
         cur.execute(query)
         i_num_return = cur.rowcount
-        print('Query: ' + query)
-        print('Row Count: {0}'.format(i_num_return))
+        arcpy.AddMessage('Query: ' + query)
+        arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
         #Build parameter lists into dictionary
         parameters = ParameterList(parameters, cur, table_type = 'snow_depth')
         cur.close()
@@ -1177,8 +1177,9 @@ def main():
         if data['bool_snow_depth']:
             path_snow_depth = SnowDepth(snow_table, time_stamp)
         DeleteScratchData(ls_scratch_data_imd)    
+        arcpy.management.Delete('in_memory')
     if data['bool_snow_properties']:
-        print('snow Properties')
+        arcpy.AddMessage('snow Properties')
         path_ul_snow_temperature, path_avg_snow_temperature = SnowCoverTemperature(time_stamp)
         path_snow_density = SnowDensityInterpolation(time_stamp)
     if data['bool_constants']:
@@ -1187,6 +1188,7 @@ def main():
     db_cnx.close()
 
     DeleteScratchData(ls_scratch_data)
+    arcpy.management.Delete('in_memory')
 
 if __name__ == '__main__':
     main()
