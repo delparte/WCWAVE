@@ -17,55 +17,7 @@ import subprocess
 arcpy.CheckOutExtension('Spatial')
 arcpy.CheckOutExtension('GeoStats')
 
-#Dictionary to hold all user input data.  
-data = {'watershed' : arcpy.GetParameterAsText(0),
-    'from_date' : arcpy.GetParameterAsText(1),
-    'to_date' : arcpy.GetParameterAsText(2),
-    'time_step' : int(arcpy.GetParameterAsText(3)),
-    'kriging_method' : arcpy.GetParameterAsText(4),
-    'bool_all_tools' : arcpy.GetParameter(5),
-    'bool_air_temperature' : arcpy.GetParameter(6),
-    'bool_constants' : arcpy.GetParameter(7),
-    'rl_constant' : arcpy.GetParameter(8),
-    'h2o_constant' : arcpy.GetParameter(9),
-    'bool_dew_point' : arcpy.GetParameter(10),
-    'bool_precip_mass' : arcpy.GetParameter(11),
-    'bool_snow_depth' : arcpy.GetParameter(12),
-    'bool_snow_properties' : arcpy.GetParameter(13),
-    'll_interp_values' : json.loads(arcpy.GetParameter(14).JSON),
-    'ul_interp_values' : json.loads(arcpy.GetParameter(15).JSON),
-    'density_interp_values' : json.loads(arcpy.GetParameter(16).JSON),
-    'bool_soil_temperature' : arcpy.GetParameter(17),
-    'bool_solar_radiation' : arcpy.GetParameter(18),
-    'bool_thermal_radiation' : arcpy.GetParameter(19),
-    'bool_vapor_pressure' : arcpy.GetParameter(20),
-    'bool_wind_speed' : arcpy.GetParameter(21)
-}
-## 
-## data = {'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
-##     'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
-##     'bool_air_temperature': True, 
-##     'bool_vapor_pressure': False, 
-##     'to_date': u'2014-01-01 13:00:00', 
-##     'time_step': 1, 
-##     'bool_soil_temperature': False, 
-##     'rl_constant': 0.005, 
-##     'from_date': u'2014-01-01 12:00:00', 
-##     'bool_solar_radiation': False, 
-##     'bool_all_tools': False, 
-##     'h2o_constant': 0.2, 
-##     'db': 'jd_data', 
-##     'bool_dew_point': False, 
-##     'bool_precip_mass': False, 
-##     'bool_wind_speed': False, 
-##     'kriging_method': u'Empirical Bayesian', 
-##     'bool_thermal_radiation': False, 
-##     'bool_constants': False, 
-##     'bool_snow_properties': False, 
-##     'watershed': u'Johnston Draw', 
-##     'bool_snow_depth': False, 
-##     'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
-##     }
+data = {}
 
 #Set up workspaces
 scratchWS = arcpy.env.scratchFolder
@@ -117,10 +69,10 @@ def selectWatershed(watershed):
         db = 'rc_data'
     return stations, elev_tiff, dem, view_factor, db
 
-def ConnectDB(db):
+def ConnectDB(db, username = 'root', passwd = ''):
     '''connect to MySQL database'''
     try:
-        cnx = mysql.connector.connect(user='root', password='',
+        cnx = mysql.connector.connect(user=username, password=passwd,
                                     host='localhost',
                                     database=db,
                                     buffered=True)
@@ -1191,6 +1143,55 @@ def main():
     arcpy.management.Delete('in_memory')
 
 if __name__ == '__main__':
+    #Dictionary to hold all user input data.  
+##     data.update({'watershed' : arcpy.GetParameterAsText(0),
+##         'from_date' : arcpy.GetParameterAsText(1),
+##         'to_date' : arcpy.GetParameterAsText(2),
+##         'time_step' : int(arcpy.GetParameterAsText(3)),
+##         'kriging_method' : arcpy.GetParameterAsText(4),
+##         'bool_all_tools' : arcpy.GetParameter(5),
+##         'bool_air_temperature' : arcpy.GetParameter(6),
+##         'bool_constants' : arcpy.GetParameter(7),
+##         'rl_constant' : arcpy.GetParameter(8),
+##         'h2o_constant' : arcpy.GetParameter(9),
+##         'bool_dew_point' : arcpy.GetParameter(10),
+##         'bool_precip_mass' : arcpy.GetParameter(11),
+##         'bool_snow_depth' : arcpy.GetParameter(12),
+##         'bool_snow_properties' : arcpy.GetParameter(13),
+##         'll_interp_values' : json.loads(arcpy.GetParameter(14).JSON),
+##         'ul_interp_values' : json.loads(arcpy.GetParameter(15).JSON),
+##         'density_interp_values' : json.loads(arcpy.GetParameter(16).JSON),
+##         'bool_soil_temperature' : arcpy.GetParameter(17),
+##         'bool_solar_radiation' : arcpy.GetParameter(18),
+##         'bool_thermal_radiation' : arcpy.GetParameter(19),
+##         'bool_vapor_pressure' : arcpy.GetParameter(20),
+##         'bool_wind_speed' : arcpy.GetParameter(21)
+##     })
+    
+    data.update({'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
+        'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
+        'bool_air_temperature': True, 
+        'bool_vapor_pressure': False, 
+        'to_date': u'2014-01-01 13:00:00', 
+        'time_step': 1, 
+        'bool_soil_temperature': False, 
+        'rl_constant': 0.005, 
+        'from_date': u'2014-01-01 12:00:00', 
+        'bool_solar_radiation': False, 
+        'bool_all_tools': False, 
+        'h2o_constant': 0.2, 
+        'db': 'jd_data', 
+        'bool_dew_point': False, 
+        'bool_precip_mass': False, 
+        'bool_wind_speed': False, 
+        'kriging_method': u'Empirical Bayesian', 
+        'bool_thermal_radiation': False, 
+        'bool_constants': False, 
+        'bool_snow_properties': False, 
+        'watershed': u'Johnston Draw', 
+        'bool_snow_depth': False, 
+        'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
+        })
     main()
 ##     import cProfile
 ##     import pstats
