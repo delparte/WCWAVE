@@ -1,6 +1,7 @@
 import grids
 import arcpy
 import datetime
+import time
 
 import matplotlib.pyplot as plt
 
@@ -11,7 +12,8 @@ def LeaveOneOutValue(raster, station_locations, site_toget):
         for row in cursor:
             if row[0] == site_toget:
                 point = '{0} {1}'.format(row[1][0], row[1][1])
-                value = arcpy.management.GetCellValue(raster, point)
+                result = arcpy.management.GetCellValue(raster, point)
+                value = float(result.getOutput(0))
     return value
 
 def ObservedValue(sites_data, parameter, site_toget):
@@ -23,17 +25,28 @@ def ObservedValue(sites_data, parameter, site_toget):
         index += 1
     return obs_value
 
-def GraphRegression(x, y):
+def GraphRegression(x = [3.07, 3.49, 6.77, 3.87, 4.90, 4.64, 3.94, 4.93, 3.99, 4.46, 3.36], 
+        y = [2.3, 3.1, 4.3, 5.3, 3.9, 5.2, 4.1, 5.0, 3.9, 5.3, 3.9]):
     print('Making Graph')
-    print 'X: {0}'.format(x)
-    print 'Y: {0}'.format(y)
-    z = y-x
-    print 'Z: {0}'.format(z)
-    z = z**2
-    plt.scatter(x,y,s=z, alpha=0.5)
+    z = []
+    for i in range(len(x)):
+        z.append(y[i] - x[i])
+        z[i] = (z[i]**2) * 150 + 1
+    plt.scatter(x,y,s=z)
+    plt.xlabel('Modeled')
+    plt.ylabel('Observed')
+    plt.show()
+
+def PrintDataToCSV(sites_names=['test'], modeled_values=[1], observed_values=[2], time_values=[3]):
+    filename = open(grids.outFolder + '\Output.txt', 'a')
+    filename.write('site_key,modeled_value,observed_value,time_to_create')
+    for i in range(len(sites_names)):
+        string = '{0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
+        filename.write(string)
     
 
 def main():
+    #PrintDataToCSV(['jdt1'],[2],[1])
     from_date_round = datetime.datetime.strptime(grids.data['from_date'], '%Y-%m-%d %H:%M:%S')
     to_date_round = datetime.datetime.strptime(grids.data['to_date'], '%Y-%m-%d %H:%M:%S')
     grids.data['from_date'] = grids.roundTime(from_date_round, 60*60)
@@ -61,7 +74,6 @@ def main():
     grids.data['ext_features'] = arcpy.Describe(grids.data['station_locations']).extent
     
     arcpy.env.cellSize = grids.data['dem']
-    arcpy.AddMessage(arcpy.Describe(grids.data['dem']).extent)
     grids.data.update({'output_cell_size' : arcpy.env.cellSize,
         'ext_elev' : arcpy.Describe(grids.data['dem']).extent
         })
@@ -72,14 +84,16 @@ def main():
             out_point_features = grids.data['fc_stations_elev'],
             interpolate_values = 'NONE',
             add_attributes = 'VALUE_ONLY')
-    print grids.data
     delta = datetime.timedelta(hours=grids.data['time_step'])
     date_increment = grids.data['from_date']
-    
+    print grids.data['fc_stations_elev']
+    scursor = arcpy.SearchCursor(grids.data['fc_stations_elev'])
+    station_welevation = []
+    for row in scursor:
+        station = row.getValue('Site_Key')
+        station_welevation.append(station)
     while date_increment < grids.data['to_date']:
         if any([grids.data['bool_air_temperature']]):
-            print date_increment
-            
             ls_scratch_data_imd = []
             
             parameters = {'site_key' : [],
@@ -105,14 +119,21 @@ def main():
             i_num_return = cur.rowcount
             parameters = grids.ParameterList(parameters, cur, table_type = 'climate')
             obs_parameters = parameters
+            print obs_parameters
             cur.close()
             
             # get sites then reset parameters dictionary
-            sites_list = parameters['site_key']
+            sites_list = []
+            for st in parameters['site_key']:
+                if st in station_welevation:
+                    sites_list.append(st)
+            print 'sites_lists len: {0}'.format(len(sites_list))
             observed = []
             modeled = []
-            
+            create_time = []
             for site in sites_list:
+                print('Leave out {0}'.format(site))
+                start = time.time()
                 parameters = {'site_key' : [],
                     'date_time' : [],
                     'air_temperature' : [],
@@ -144,16 +165,20 @@ def main():
                     obs_point = ObservedValue(obs_parameters, 'air_temperature', site)
                     modeled.append(point_error)
                     observed.append(obs_point)
+                end_air = time.time()
+                create_time.append(end_air - start)
+            print create_time
             GraphRegression(modeled, observed)
+##         GraphRegression()
+            PrintDataToCSV(sites_list, modeled, observed, create_time)
         date_increment += delta
-    print grids.data
 
 
 if __name__ == '__main__':
-    grids.data.update({'from_date' : u'2014-01-01 12:00:00',
-        'to_date' : u'2014-01-01 13:00:00',
+    grids.data.update({'from_date' : u'2008-01-03 02:00:00',
+        'to_date' : u'2008-01-03 03:00:00',
         'bool_air_temperature' : True,
-        'watershed' : 'Johnston Draw',
+        'watershed' : 'Reynolds Creek',
         'time_step' : 1,
         'kriging_method' : 'Empirical Bayesian'
         })

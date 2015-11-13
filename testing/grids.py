@@ -915,7 +915,6 @@ def DeleteScratchData(in_list):
 # Main Function --- Figure out a way to be run as script or as tool
 #======================================================================
 def main():
-    tmp3 = 'ta' # used in SQL 
     from_date_round = datetime.datetime.strptime(data['from_date'], '%Y-%m-%d %H:%M:%S')
     to_date_round = datetime.datetime.strptime(data['to_date'], '%Y-%m-%d %H:%M:%S')
     data['from_date'] = roundTime(from_date_round, 60*60)
@@ -1018,7 +1017,7 @@ def main():
             if data['bool_thermal_radiation']:
                 #Query database for average air temperature for current day
                 sFromTR = date_increment.strftime("%Y-%m-%d")
-                sQuery2 = ("SELECT AVG(NULLIF(" + tmp3 + ", -999)) FROM weather " 
+                sQuery2 = ("SELECT AVG(NULLIF('ta' , -999)) FROM weather " 
                            "WHERE date_time >= '" + sFromTR + " 00:00:00" + "' " 
                            "AND date_time <= '" + sFromTR + " 23:00:00'")
                 cur2 = db_cnx.cursor()
@@ -1171,7 +1170,7 @@ if __name__ == '__main__':
     data.update({'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
         'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
         'bool_air_temperature': True, 
-        'bool_vapor_pressure': False, 
+        'bool_vapor_pressure': True, 
         'to_date': u'2014-01-01 13:00:00', 
         'time_step': 1, 
         'bool_soil_temperature': False, 
@@ -1184,8 +1183,8 @@ if __name__ == '__main__':
         'bool_dew_point': False, 
         'bool_precip_mass': False, 
         'bool_wind_speed': False, 
-        'kriging_method': u'Empirical Bayesian', 
-        'bool_thermal_radiation': False, 
+        'kriging_method': u'Detrended', 
+        'bool_thermal_radiation': True, 
         'bool_constants': False, 
         'bool_snow_properties': False, 
         'watershed': u'Johnston Draw', 
