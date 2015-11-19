@@ -25,28 +25,47 @@ def ObservedValue(sites_data, parameter, site_toget):
         index += 1
     return obs_value
 
-def GraphRegression(x = [3.07, 3.49, 6.77, 3.87, 4.90, 4.64, 3.94, 4.93, 3.99, 4.46, 3.36], 
-        y = [2.3, 3.1, 4.3, 5.3, 3.9, 5.2, 4.1, 5.0, 3.9, 5.3, 3.9]):
+def GraphRegression(time_stamp, label=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i','j','k'],
+        x = [3.07, 3.49, 6.77, 3.87, 4.90, 4.64, 3.94, 4.93, 3.99, 4.46, 3.36], 
+        y = [2.3, 3.1, 4.3, 5.3, 3.9, 5.2, 4.1, 5.0, 3.9, 5.3, 3.9] ):
     print('Making Graph')
+    print('X: {0}'.format(x))
+    print('Y: {0}'.format(y))
+    abs_error = []
+    sqr_error = []
     z = []
     for i in range(len(x)):
         z.append(y[i] - x[i])
+        abs_error.append(abs(y[i]-x[i]))
+        sqr_error.append(abs(y[i]-x[i])**2)
         z[i] = (z[i]**2) * 150 + 1
+    mae = sum(abs_error)/len(abs_error)
+    mae = round(mae, 2)
+    rmse = sum(sqr_error)/len(sqr_error)
+    rmse = round(rmse, 2)
+    plt.title('Data for {0}; RMSE={1}; MAE={2}'.format(time_stamp,rmse, mae))
     plt.scatter(x,y,s=z)
     plt.xlabel('Modeled')
     plt.ylabel('Observed')
-    plt.show()
+    i=0
+    for point in label:
+        plt.annotate(point, xy = (x[i],y[i]), xytext = (3,10),
+                textcoords = 'offset points', 
+                bbox=dict(boxstyle = 'round,pad=0.2', fc='yellow', alpha = 0.5))
+        i+=1
+##     plt.show()
+    plt.savefig('{0}\scatter_{1}.png'.format(grids.outFolder,time_stamp))
+    plt.clf()
 
 def PrintDataToCSV(sites_names=['test'], modeled_values=[1], observed_values=[2], time_values=[3]):
     filename = open(grids.outFolder + '\Output.txt', 'a')
-    filename.write('site_key,modeled_value,observed_value,time_to_create')
+    filename.write('site_key,modeled_value,observed_value,time_to_create (s)\n')
     for i in range(len(sites_names)):
         string = '{0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
         filename.write(string)
     
 
 def main():
-    #PrintDataToCSV(['jdt1'],[2],[1])
     from_date_round = datetime.datetime.strptime(grids.data['from_date'], '%Y-%m-%d %H:%M:%S')
     to_date_round = datetime.datetime.strptime(grids.data['to_date'], '%Y-%m-%d %H:%M:%S')
     grids.data['from_date'] = grids.roundTime(from_date_round, 60*60)
@@ -167,16 +186,19 @@ def main():
                     observed.append(obs_point)
                 end_air = time.time()
                 create_time.append(end_air - start)
-            print create_time
-            GraphRegression(modeled, observed)
+##             print create_time
+            GraphRegression(time_stamp = time_stamp,
+                    label = sites_list,
+                    x = modeled,
+                    y = observed)
 ##         GraphRegression()
             PrintDataToCSV(sites_list, modeled, observed, create_time)
         date_increment += delta
 
 
 if __name__ == '__main__':
-    grids.data.update({'from_date' : u'2008-01-03 02:00:00',
-        'to_date' : u'2008-01-03 03:00:00',
+    grids.data.update({'from_date' : u'2007-12-01 00:00:00',
+        'to_date' : u'2007-12-02 00:00:00',
         'bool_air_temperature' : True,
         'watershed' : 'Reynolds Creek',
         'time_step' : 1,
