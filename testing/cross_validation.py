@@ -2,6 +2,7 @@ import grids
 import arcpy
 import datetime
 import time
+import math
 
 import matplotlib.pyplot as plt
 
@@ -37,11 +38,11 @@ def GraphRegression(time_stamp, label=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', '
     for i in range(len(x)):
         z.append(y[i] - x[i])
         abs_error.append(abs(y[i]-x[i]))
-        sqr_error.append(abs(y[i]-x[i])**2)
+        sqr_error.append((y[i]-x[i])**2)
         z[i] = (z[i]**2) * 150 + 1
     mae = sum(abs_error)/len(abs_error)
     mae = round(mae, 2)
-    rmse = sum(sqr_error)/len(sqr_error)
+    rmse = math.sqrt(sum(sqr_error)/len(sqr_error))
     rmse = round(rmse, 2)
     plt.title('Data for {0}; RMSE={1}; MAE={2}'.format(time_stamp,rmse, mae))
     plt.scatter(x,y,s=z)
@@ -61,7 +62,7 @@ def PrintDataToCSV(sites_names=['test'], modeled_values=[1], observed_values=[2]
     filename = open(grids.outFolder + '\Output.txt', 'a')
     filename.write('site_key,modeled_value,observed_value,time_to_create (s)\n')
     for i in range(len(sites_names)):
-        string = '{0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
+        string = 'abs({0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
         filename.write(string)
     
 
@@ -197,10 +198,17 @@ def main():
 
 
 if __name__ == '__main__':
-    grids.data.update({'from_date' : u'2007-12-01 00:00:00',
-        'to_date' : u'2007-12-02 00:00:00',
+##     grids.data.update({'from_date' : u'2007-12-01 00:00:00',
+##         'to_date' : u'2007-12-02 00:00:00',
+##         'bool_air_temperature' : True,
+##         'watershed' : 'Reynolds Creek',
+##         'time_step' : 1,
+##         'kriging_method' : 'Empirical Bayesian'
+##         })
+    grids.data.update({'from_date' : u'2013-12-01 00:00:00',
+        'to_date' : u'2013-12-02 00:00:00',
         'bool_air_temperature' : True,
-        'watershed' : 'Reynolds Creek',
+        'watershed' : 'Johnston Draw',
         'time_step' : 1,
         'kriging_method' : 'Empirical Bayesian'
         })
