@@ -1001,19 +1001,24 @@ def main():
             # Run interpolation tools
             if data['bool_air_temperature']:
                 path_air_temp = AirTemperature(climate_table, time_stamp)
+                ls_output.append(path_air_temp)
             if data['bool_dew_point']:
                 path_dew_point = DewPoint(climate_table, time_stamp)
                 path_percent_snow = PercentSnow(path_dew_point, time_stamp)
                 path_snow_density = SnowDensity(path_dew_point, time_stamp)
+                ls_output.extend([path_dew_point, path_percent_snow, path_snow_density])
             if data['bool_vapor_pressure']:
                 path_vapor_pressure = VaporPressure(climate_table, time_stamp)
+                ls_output.append(path_vapor_pressure)
             if data['bool_wind_speed']:
                 path_wind_speed = WindSpeed(climate_table, time_stamp, from_date)
+                ls_output.append(path_wind_speed)
             if data['bool_solar_radiation']:
                 path_solar_radiation = SolarRadiation(climate_table,
                             time_stamp, 
                             date_increment,
                             data['time_step'])
+                ls_output.append(path_solar_radiation)
             if data['bool_thermal_radiation']:
                 #Query database for average air temperature for current day
                 sFromTR = date_increment.strftime("%Y-%m-%d")
@@ -1030,6 +1035,7 @@ def main():
                         path_air_temp, 
                         path_vapor_pressure, 
                         d_ref_temp)
+                ls_output.append(path_thermal_radiation)
 
             DeleteScratchData(ls_scratch_data_imd)
             arcpy.management.Delete('in_memory')
@@ -1064,6 +1070,7 @@ def main():
             
             if data['bool_precip_mass']:
                 path_precip_mass = PrecipitationMass(precip_table, time_stamp)
+                ls_output.append(path_precip_mass)
             DeleteScratchData(ls_scratch_data_imd)
             arcpy.management.Delete('in_memory')
         if any([data['bool_all_tools'], data['bool_soil_temperature']]):
@@ -1094,6 +1101,7 @@ def main():
             
             if data['bool_soil_temperature']:
                 path_soil_temp = SoilTemperature(soil_table, time_stamp)
+                ls_output.append(path_soil_temp)
             DeleteScratchData(ls_scratch_data_imd)
             arcpy.management.Delete('in_memory')
         date_increment += delta
@@ -1127,19 +1135,26 @@ def main():
         #Run gridding function
         if data['bool_snow_depth']:
             path_snow_depth = SnowDepth(snow_table, time_stamp)
+            ls_output.append(path_snow_depth)
         DeleteScratchData(ls_scratch_data_imd)    
         arcpy.management.Delete('in_memory')
     if data['bool_snow_properties']:
         arcpy.AddMessage('snow Properties')
         path_ul_snow_temperature, path_avg_snow_temperature = SnowCoverTemperature(time_stamp)
         path_snow_density = SnowDensityInterpolation(time_stamp)
+        ls_output.extend([path_ul_snow_temperature, path_avg_snow_temperature, path_snow_density])
     if data['bool_constants']:
         path_rl_constant, path_h2o_constant = Constants(data['rl_constant'], data['h2o_constant'], time_stamp)
+        ls_output.extend([path_rl_constant, path_h2o_constant])
     
     db_cnx.close()
 
     DeleteScratchData(ls_scratch_data)
     arcpy.management.Delete('in_memory')
+
+    shutil.make_archive(data['out_folder'],'zip', data['out_folder'])
+
+    arcpy.SetParameterAsText(22, data['out_folder'] + '.zip')
 
 if __name__ == '__main__':
     #Dictionary to hold all user input data.  
@@ -1173,22 +1188,22 @@ if __name__ == '__main__':
         'bool_vapor_pressure': True, 
         'to_date': u'2014-01-01 13:00:00', 
         'time_step': 1, 
-        'bool_soil_temperature': False, 
+        'bool_soil_temperature': True, 
         'rl_constant': 0.005, 
         'from_date': u'2014-01-01 12:00:00', 
-        'bool_solar_radiation': False, 
-        'bool_all_tools': False, 
+        'bool_solar_radiation': True, 
+        'bool_all_tools': True, 
         'h2o_constant': 0.2, 
         'db': 'jd_data', 
-        'bool_dew_point': False, 
-        'bool_precip_mass': False, 
-        'bool_wind_speed': False, 
+        'bool_dew_point': True, 
+        'bool_precip_mass': True, 
+        'bool_wind_speed': True, 
         'kriging_method': u'Detrended', 
         'bool_thermal_radiation': True, 
-        'bool_constants': False, 
-        'bool_snow_properties': False, 
+        'bool_constants': True, 
+        'bool_snow_properties': True, 
         'watershed': u'Johnston Draw', 
-        'bool_snow_depth': False, 
+        'bool_snow_depth': True, 
         'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
         })
     main()
