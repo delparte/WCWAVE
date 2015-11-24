@@ -6,8 +6,10 @@ import math
 
 import matplotlib.pyplot as plt
 
+arcpy.env.parallelProcessingFactor = '100%'
+
 def LeaveOneOutValue(raster, station_locations, site_toget):
-    print ('Extracting leave one out value for {0}'.format(site_toget))
+    arcpy.AddMessage('Extracting leave one out value for {0}'.format(site_toget))
     with arcpy.da.SearchCursor(in_table = station_locations, 
             field_names = ['Site_Key','SHAPE@XY']) as cursor:
         for row in cursor:
@@ -18,7 +20,7 @@ def LeaveOneOutValue(raster, station_locations, site_toget):
     return value
 
 def ObservedValue(sites_data, parameter, site_toget):
-    print('Get observed value from table')
+    arcpy.AddMessage('Get observed value from table')
     index = 0
     for name in sites_data['site_key']:
         if name == site_toget:
@@ -26,12 +28,13 @@ def ObservedValue(sites_data, parameter, site_toget):
         index += 1
     return obs_value
 
-def GraphRegression(time_stamp, label=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i','j','k'],
+def GraphRegression(time_stamp, param_type = 'test', 
+        label=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i','j','k'],
         x = [3.07, 3.49, 6.77, 3.87, 4.90, 4.64, 3.94, 4.93, 3.99, 4.46, 3.36], 
         y = [2.3, 3.1, 4.3, 5.3, 3.9, 5.2, 4.1, 5.0, 3.9, 5.3, 3.9] ):
-    print('Making Graph')
-    print('X: {0}'.format(x))
-    print('Y: {0}'.format(y))
+    arcpy.AddMessage('Making {0} Graph'.format(param_type))
+    arcpy.AddMessage('X: {0}'.format(x))
+    arcpy.AddMessage('Y: {0}'.format(y))
     abs_error = []
     sqr_error = []
     z = []
@@ -44,8 +47,15 @@ def GraphRegression(time_stamp, label=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', '
     mae = round(mae, 2)
     rmse = math.sqrt(sum(sqr_error)/len(sqr_error))
     rmse = round(rmse, 2)
-    plt.title('Data for {0}; RMSE={1}; MAE={2}'.format(time_stamp,rmse, mae))
-    plt.scatter(x,y,s=z)
+    
+    #Select which color the points will be based on parameter type (air temp, dew point, etc.)
+    if param_type == 'test' or param_type == 'T_a':
+        point_color = 'blue'
+    elif param_type == 'T_pp':
+        point_color = 'red'
+    
+    plt.title('{0} for {1}; RMSE={2}; MAE={3}'.format(param_type, time_stamp,rmse, mae))
+    plt.scatter(x,y,s=z, c=point_color)
     plt.xlabel('Modeled')
     plt.ylabel('Observed')
     i=0
@@ -55,14 +65,14 @@ def GraphRegression(time_stamp, label=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', '
                 bbox=dict(boxstyle = 'round,pad=0.2', fc='yellow', alpha = 0.5))
         i+=1
 ##     plt.show()
-    plt.savefig('{0}\scatter_{1}.png'.format(grids.outFolder,time_stamp))
+    plt.savefig('{0}\{1}_scatter_{2}.png'.format(grids.outFolder,param_type, time_stamp))
     plt.clf()
 
 def PrintDataToCSV(sites_names=['test'], modeled_values=[1], observed_values=[2], time_values=[3]):
     filename = open(grids.outFolder + '\Output.txt', 'a')
     filename.write('site_key,modeled_value,observed_value,time_to_create (s)\n')
     for i in range(len(sites_names)):
-        string = 'abs({0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
+        string = '{0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
         filename.write(string)
     
 
@@ -113,6 +123,7 @@ def main():
         station = row.getValue('Site_Key')
         station_welevation.append(station)
     while date_increment < grids.data['to_date']:
+        arcpy.AddMessage(date_increment)
         if any([grids.data['bool_air_temperature']]):
             ls_scratch_data_imd = []
             
@@ -148,12 +159,11 @@ def main():
                 if st in station_welevation:
                     sites_list.append(st)
             print 'sites_lists len: {0}'.format(len(sites_list))
-            observed = []
-            modeled = []
-            create_time = []
+            observed = {'air_temperature': [], 'dew_point': []}
+            modeled = {'air_temperature': [], 'dew_point': []} 
+            create_time = {'air_temperature': [], 'dew_point': []}
             for site in sites_list:
-                print('Leave out {0}'.format(site))
-                start = time.time()
+                arcpy.AddMessage('Leave out {0}'.format(site))
                 parameters = {'site_key' : [],
                     'date_time' : [],
                     'air_temperature' : [],
@@ -177,37 +187,55 @@ def main():
                 climate_table = grids.BuildClimateTable(parameters, i_num_return)
                 ls_scratch_data_imd.append(climate_table)
                 # Run interpolation tools
+                start = time.time()
                 if grids.data['bool_air_temperature']:
                     path_air_temp = grids.AirTemperature(climate_table, time_stamp)
                     point_error = LeaveOneOutValue(raster = path_air_temp, 
                             site_toget = site,
                             station_locations = grids.data['station_locations'])
                     obs_point = ObservedValue(obs_parameters, 'air_temperature', site)
-                    modeled.append(point_error)
-                    observed.append(obs_point)
+                    modeled['air_temperature'].append(point_error)
+                    observed['air_temperature'].append(obs_point)
                 end_air = time.time()
-                create_time.append(end_air - start)
-##             print create_time
+                create_time['air_temperature'].append(end_air - start)
+                start = time.time()
+                if grids.data['bool_dew_point']:
+                    path_dew_point = grids.DewPoint(climate_table, time_stamp)
+                    point_error = LeaveOneOutValue(raster = path_dew_point,
+                            site_toget = site,
+                            station_locations = grids.data['station_locations'])
+                    obs_point = ObservedValue(obs_parameters, 'dew_point', site)
+                    modeled['dew_point'].append(point_error)
+                    observed['dew_point'].append(obs_point)
+                end_dew = time.time()
+                create_time['dew_point'].append(end_dew - start)
             GraphRegression(time_stamp = time_stamp,
                     label = sites_list,
-                    x = modeled,
-                    y = observed)
+                    param_type = 'T_a',
+                    x = modeled['air_temperature'],
+                    y = observed['air_temperature'])
+            GraphRegression(time_stamp = time_stamp,
+                    label = sites_list,
+                    param_type = 'T_pp',
+                    x = modeled['dew_point'],
+                    y = observed['dew_point'])
 ##         GraphRegression()
-            PrintDataToCSV(sites_list, modeled, observed, create_time)
+            PrintDataToCSV(sites_list, modeled['air_temperature'], observed['air_temperature'], create_time['air_temperature'])
         date_increment += delta
 
 
 if __name__ == '__main__':
-##     grids.data.update({'from_date' : u'2007-12-01 00:00:00',
-##         'to_date' : u'2007-12-02 00:00:00',
+##     grids.data.update({'from_date' : u'2008-03-01 00:00:00',
+##         'to_date' : u'2008-03-02 00:00:00',
 ##         'bool_air_temperature' : True,
 ##         'watershed' : 'Reynolds Creek',
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
 ##         })
-    grids.data.update({'from_date' : u'2013-12-01 00:00:00',
-        'to_date' : u'2013-12-02 00:00:00',
+    grids.data.update({'from_date' : u'2014-03-01 00:00:00',
+        'to_date' : u'2014-03-01 01:00:00',
         'bool_air_temperature' : True,
+        'bool_dew_point': True,
         'watershed' : 'Johnston Draw',
         'time_step' : 1,
         'kriging_method' : 'Empirical Bayesian'
