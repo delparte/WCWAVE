@@ -50,9 +50,15 @@ def GraphRegression(time_stamp, param_type = 'test',
     
     #Select which color the points will be based on parameter type (air temp, dew point, etc.)
     if param_type == 'test' or param_type == 'T_a':
-        point_color = 'blue'
+        point_color = 'gray'
     elif param_type == 'T_pp':
+        point_color = 'green'
+    elif param_type == 'e_a':
         point_color = 'red'
+    elif param_type == 'ppts':
+        point_color = 'blue'
+    elif param_type == 'zs':
+        point_color = 'yellow'
     
     plt.title('{0} for {1}; RMSE={2}; MAE={3}'.format(param_type, time_stamp,rmse, mae))
     plt.scatter(x,y,s=z, c=point_color)
@@ -159,9 +165,9 @@ def main():
                 if st in station_welevation:
                     sites_list.append(st)
             print 'sites_lists len: {0}'.format(len(sites_list))
-            observed = {'air_temperature': [], 'dew_point': []}
-            modeled = {'air_temperature': [], 'dew_point': []} 
-            create_time = {'air_temperature': [], 'dew_point': []}
+            observed = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
+            modeled = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []} 
+            create_time = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
             for site in sites_list:
                 arcpy.AddMessage('Leave out {0}'.format(site))
                 parameters = {'site_key' : [],
@@ -209,6 +215,17 @@ def main():
                     observed['dew_point'].append(obs_point)
                 end_dew = time.time()
                 create_time['dew_point'].append(end_dew - start)
+                if grids.data['bool_vapor_pressure']:
+                    path_vapor_pressure = grids.DewPoint(climate_table, time_stamp)
+                    point_error = LeaveOneOutValue(raster = path_vapor_pressure,
+                            site_toget = site,
+                            station_locations = grids.data['station_locations'])
+                    obs_point = ObservedValue(obs_parameters, 'vapor_pressure', site)
+                    modeled['vapor_pressure'].append(point_error)
+                    observed['vapor_pressure'].append(obs_point)
+                end_dew = time.time()
+                create_time['vapor_pressure'].append(end_dew - start)
+
             GraphRegression(time_stamp = time_stamp,
                     label = sites_list,
                     param_type = 'T_a',
@@ -219,6 +236,12 @@ def main():
                     param_type = 'T_pp',
                     x = modeled['dew_point'],
                     y = observed['dew_point'])
+            GraphRegression(time_stamp = time_stamp,
+                    label = sites_list,
+                    param_type = 'e_a',
+                    x = modeled['vapor_pressure'],
+                    y = observed['vapor_pressure'])
+
 ##         GraphRegression()
             PrintDataToCSV(sites_list, modeled['air_temperature'], observed['air_temperature'], create_time['air_temperature'])
         date_increment += delta
@@ -236,6 +259,7 @@ if __name__ == '__main__':
         'to_date' : u'2014-03-01 01:00:00',
         'bool_air_temperature' : True,
         'bool_dew_point': True,
+        'bool_vapor_pressure': True,
         'watershed' : 'Johnston Draw',
         'time_step' : 1,
         'kriging_method' : 'Empirical Bayesian'
