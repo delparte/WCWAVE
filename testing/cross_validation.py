@@ -1,4 +1,3 @@
-import grids
 import arcpy
 import datetime
 import time
@@ -6,6 +5,10 @@ import math
 import numpy as np
 
 import matplotlib.pyplot as plt
+
+import sys
+sys.path.append('..')
+import gridtools as grids
 
 arcpy.env.parallelProcessingFactor = '100%'
 
