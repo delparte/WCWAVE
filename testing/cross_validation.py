@@ -3,6 +3,7 @@ import arcpy
 import datetime
 import time
 import math
+import numpy as np
 
 import matplotlib.pyplot as plt
 
@@ -28,7 +29,7 @@ def ObservedValue(sites_data, parameter, site_toget):
         index += 1
     return obs_value
 
-def GraphRegression(time_stamp, param_type = 'test', 
+def GraphRegression(time_stamp='test', param_type = 'test', 
         label=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i','j','k'],
         x = [3.07, 3.49, 6.77, 3.87, 4.90, 4.64, 3.94, 4.93, 3.99, 4.46, 3.36], 
         y = [2.3, 3.1, 4.3, 5.3, 3.9, 5.2, 4.1, 5.0, 3.9, 5.3, 3.9] ):
@@ -39,10 +40,11 @@ def GraphRegression(time_stamp, param_type = 'test',
     sqr_error = []
     z = []
     for i in range(len(x)):
-        z.append(y[i] - x[i])
+        z.append(y[i] - x[i]) # Observed minus modeled
         abs_error.append(abs(y[i]-x[i]))
         sqr_error.append((y[i]-x[i])**2)
-        z[i] = (z[i]**2) * 150 + 1
+        z[i] = abs(z[i]) * 100
+    print z
     mae = sum(abs_error)/len(abs_error)
     mae = round(mae, 2)
     rmse = math.sqrt(sum(sqr_error)/len(sqr_error))
@@ -59,6 +61,10 @@ def GraphRegression(time_stamp, param_type = 'test',
         point_color = 'blue'
     elif param_type == 'zs':
         point_color = 'yellow'
+
+    trendline = np.polyfit(x, y, 1)
+    p = np.poly1d(trendline)
+    plt.plot(x, p(x), 'k-')
     
     plt.title('{0} for {1}; RMSE={2}; MAE={3}'.format(param_type, time_stamp,rmse, mae))
     plt.scatter(x,y,s=z, c=point_color)
@@ -74,8 +80,8 @@ def GraphRegression(time_stamp, param_type = 'test',
     plt.savefig('{0}\{1}_scatter_{2}.png'.format(grids.outFolder,param_type, time_stamp))
     plt.clf()
 
-def PrintDataToCSV(sites_names=['test'], modeled_values=[1], observed_values=[2], time_values=[3]):
-    filename = open(grids.outFolder + '\Output.txt', 'a')
+def PrintDataToCSV(parameter, sites_names=['test'], modeled_values=[1], observed_values=[2], time_values=[3]):
+    filename = open('{0}\Output_{1}.txt'.format(grids.outFolder, parameter), 'a')
     filename.write('site_key,modeled_value,observed_value,time_to_create (s)\n')
     for i in range(len(sites_names)):
         string = '{0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
@@ -231,35 +237,38 @@ def main():
                     param_type = 'T_a',
                     x = modeled['air_temperature'],
                     y = observed['air_temperature'])
-            GraphRegression(time_stamp = time_stamp,
-                    label = sites_list,
-                    param_type = 'T_pp',
-                    x = modeled['dew_point'],
-                    y = observed['dew_point'])
-            GraphRegression(time_stamp = time_stamp,
-                    label = sites_list,
-                    param_type = 'e_a',
-                    x = modeled['vapor_pressure'],
-                    y = observed['vapor_pressure'])
+##             GraphRegression(time_stamp = time_stamp,
+##                     label = sites_list,
+##                     param_type = 'T_pp',
+##                     x = modeled['dew_point'],
+##                     y = observed['dew_point'])
+##             GraphRegression(time_stamp = time_stamp,
+##                     label = sites_list,
+##                     param_type = 'e_a',
+##                     x = modeled['vapor_pressure'],
+##                     y = observed['vapor_pressure'])
 
 ##         GraphRegression()
-            PrintDataToCSV(sites_list, modeled['air_temperature'], observed['air_temperature'], create_time['air_temperature'])
+            PrintDataToCSV('air_temp', sites_list, modeled['air_temperature'], observed['air_temperature'], create_time['air_temperature'])
+            
         date_increment += delta
 
 
 if __name__ == '__main__':
-##     grids.data.update({'from_date' : u'2008-03-01 00:00:00',
-##         'to_date' : u'2008-03-02 00:00:00',
+##     grids.data.update({'from_date' : u'2007-12-01 00:00:00',
+##         'to_date' : u'2007-12-03 00:00:00',
 ##         'bool_air_temperature' : True,
+##         'bool_dew_point': False,
+##         'bool_vapor_pressure': False,
 ##         'watershed' : 'Reynolds Creek',
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
 ##         })
-    grids.data.update({'from_date' : u'2014-03-01 00:00:00',
-        'to_date' : u'2014-03-01 01:00:00',
+    grids.data.update({'from_date' : u'2014-01-01 00:00:00',
+        'to_date' : u'2014-01-01 01:00:00',
         'bool_air_temperature' : True,
-        'bool_dew_point': True,
-        'bool_vapor_pressure': True,
+        'bool_dew_point': False,
+        'bool_vapor_pressure': False,
         'watershed' : 'Johnston Draw',
         'time_step' : 1,
         'kriging_method' : 'Empirical Bayesian'
