@@ -8,6 +8,7 @@ import numpy
 #from scipy import stats
 import mysql.connector
 from mysql.connector import errorcode
+import sqlite3
 import datetime
 import json
 import shutil
@@ -17,7 +18,7 @@ import subprocess
 arcpy.CheckOutExtension('Spatial')
 arcpy.CheckOutExtension('GeoStats')
 
-data = {}
+data = {'sql_ph': '%s'}
 
 #Set up workspaces
 scratchWS = arcpy.env.scratchFolder
@@ -67,34 +68,47 @@ def selectWatershed(watershed):
         dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_South'
         view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10M_South'
         db = 'rc_data'
-    return stations, elev_tiff, dem, view_factor, db
+    elif watershed == 'TESTING':
+        arcpy.AddMessage('Testing watershed')
+        stations = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_sites.shp'
+        elev_tiff = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data.tif'
+        dem = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data.tif'
+        view_factor = ''
+        db = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo.db'
+        data['sql_ph'] = '?'
+        return stations, elev_tiff, dem, view_factor, db
 
 def ConnectDB(db, username = 'root', passwd = ''):
     '''connect to MySQL database'''
-    try:
-        cnx = mysql.connector.connect(user=username, password=passwd,
-                                    host='localhost',
-                                    database=db,
-                                    buffered=True)
-        return cnx
-    except mysql.connector.Error as err:
+    if len(db.split('.')) == 1:
+        try:
+            cnx = mysql.connector.connect(user=username, password=passwd,
+                                        host='localhost',
+                                        database=db,
+                                        buffered=True)
+            return cnx
+        except mysql.connector.Error as err:
 
-        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            arcpy.AddMessage('Something is wrong with your user name or password')
-        elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            arcpy.AddMessage('Database does not exist')
+            if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+                arcpy.AddMessage('Something is wrong with your user name or password')
+            elif err.errno == errorcode.ER_BAD_DB_ERROR:
+                arcpy.AddMessage('Database does not exist')
+            else:
+                arcpy.AddMessage(err)
         else:
-            arcpy.AddMessage(err)
-    else:
-        arcpy.AddMessage('Connection successful')
+            arcpy.AddMessage('Connection successful')
+    ## Connect to sqlite3 database
+    elif len(db.split('.')) == 2:
+        cnx = sqlite3.connect(db)
+        return cnx
+
 
 def ParameterList(param_dict, rows, table_type):
     '''Append all data to the end of the parameter list'''
-    count = rows.rowcount
     if table_type == 'climate':
-        for i in range(0, count):
-            row = rows.fetchone()
-            if data['watershed'] == 'Johnston Draw':
+        for row in rows:
+            if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'TESTING':
+                print data['watershed']
                 param_dict['site_key'].append(row[0])
                 param_dict['date_time'].append(row[1])
                 param_dict['air_temperature'].append(row[8])
@@ -113,8 +127,7 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['wind_speed'].append(row[14])
                 param_dict['wind_direction'].append(row[15])
     elif table_type == 'precip':
-        for i in range(0,count):
-            row = rows.fetchone()
+        for row in rows:
             if data['watershed'] == 'Johnston Draw':
                 param_dict['site_key'].append(row[0])
                 param_dict['ppts'].append(row[2])
@@ -126,14 +139,12 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['pptu'].append(row[3])
                 param_dict['ppta'].append(row[4])
     elif table_type == 'soil_temperature':
-        for i in range(0,count):
-            row = rows.fetchone()
+        for row in rows:
             if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek':
                 param_dict['site_key'].append(row[0])
                 param_dict['stm005'].append(row[3]) # column 3 is soil temp at 5 cm depth
     elif table_type == 'snow_depth':
-        for i in range(0,count):
-            row = rows.fetchone()
+        for row in rows:
             if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek':
                 param_dict['site_key'].append(row[0])
                 param_dict['zs'].append(row[8])
@@ -155,6 +166,8 @@ def BuildClimateTable(params, num):
             field_type = ftype)
         keys.append(key)
     in_cursor = arcpy.InsertCursor(table)
+    print keys
+    print params
     #Add data from rows into climate table
     for j in range(0, num):
         row = in_cursor.newRow()
@@ -984,15 +997,16 @@ def main():
             to_date_temp = date_increment + delta
             to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
             query = ('SELECT * FROM weather WHERE '\
-                'date_time >= "' + from_date + '" '\
-                'AND date_time < "' + to_date + '"')
+                'date_time >= ' + data['sql_ph'] + ' '\
+                'AND date_time < ' + data['sql_ph'] + ';')
             cur = db_cnx.cursor()
-            cur.execute(query)
-            i_num_return = cur.rowcount
+            cur.execute(query, (from_date,to_date))
+            rows = cur.fetchall()
+            i_num_return = len(rows)
             arcpy.AddMessage('Query: ' + query)
-            arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
+            #arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
             #Build parameter lists into dictionary
-            parameters = ParameterList(parameters, cur, table_type = 'climate')
+            parameters = ParameterList(parameters, rows, table_type = 'climate')
             cur.close()
             
             # Build Climate table
@@ -1022,7 +1036,7 @@ def main():
             if data['bool_thermal_radiation']:
                 #Query database for average air temperature for current day
                 sFromTR = date_increment.strftime("%Y-%m-%d")
-                sQuery2 = ("SELECT AVG(NULLIF('ta' , -999)) FROM weather " 
+                sQuery2 = ("SELECT AVG(NULLIF(ta , -999)) FROM weather " 
                            "WHERE date_time >= '" + sFromTR + " 00:00:00" + "' " 
                            "AND date_time <= '" + sFromTR + " 23:00:00'")
                 cur2 = db_cnx.cursor()
@@ -1036,7 +1050,7 @@ def main():
                         path_vapor_pressure, 
                         d_ref_temp)
                 ls_output.append(path_thermal_radiation)
-
+            
             DeleteScratchData(ls_scratch_data_imd)
             arcpy.management.Delete('in_memory')
         if any([data['bool_all_tools'], data['bool_precip_mass']]):
@@ -1056,7 +1070,7 @@ def main():
             to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
             query = ('SELECT * FROM precipitation WHERE '\
                     'date_time >= "' + from_date + '" '\
-                    'AND date_time < "' + to_date + '"')
+                    'AND date_time < "' + to_date + '";')
             cur = db_cnx.cursor()
             cur.execute(query)
             i_num_return = cur.rowcount
@@ -1087,7 +1101,7 @@ def main():
             to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
             query = ('SELECT * FROM soil_temperature WHERE '\
                     'date_time >= "' + from_date + '" '\
-                    'AND date_time < "' + to_date + '"')
+                    'AND date_time < "' + to_date + '";')
             cur = db_cnx.cursor()
             cur.execute(query)
             i_num_return = cur.rowcount
@@ -1120,7 +1134,7 @@ def main():
                 }
         query = ('SELECT * FROM snow_depth WHERE '\
                 'date_time >= "' + from_date + '" '\
-                'AND date_time < "' + to_date + '"')
+                'AND date_time < "' + to_date + '";')
         cur = db_cnx.cursor()
         cur.execute(query)
         i_num_return = cur.rowcount
@@ -1185,25 +1199,25 @@ if __name__ == '__main__':
     data.update({'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
         'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
         'bool_air_temperature': True, 
-        'bool_vapor_pressure': True, 
+        'bool_vapor_pressure': False, 
         'to_date': u'2014-01-01 13:00:00', 
         'time_step': 1, 
-        'bool_soil_temperature': True, 
+        'bool_soil_temperature': False, 
         'rl_constant': 0.005, 
         'from_date': u'2014-01-01 12:00:00', 
-        'bool_solar_radiation': True, 
-        'bool_all_tools': True, 
+        'bool_solar_radiation': False, 
+        'bool_all_tools': False, 
         'h2o_constant': 0.2, 
         'db': 'jd_data', 
-        'bool_dew_point': True, 
-        'bool_precip_mass': True, 
-        'bool_wind_speed': True, 
-        'kriging_method': u'Detrended', 
-        'bool_thermal_radiation': True, 
-        'bool_constants': True, 
-        'bool_snow_properties': True, 
-        'watershed': u'Johnston Draw', 
-        'bool_snow_depth': True, 
+        'bool_dew_point': False, 
+        'bool_precip_mass': False, 
+        'bool_wind_speed': False, 
+        'kriging_method': u'Empirical Bayesian', 
+        'bool_thermal_radiation': False, 
+        'bool_constants': False, 
+        'bool_snow_properties': False, 
+        'watershed': u'TESTING', 
+        'bool_snow_depth': False, 
         'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
         })
     main()
