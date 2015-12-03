@@ -73,10 +73,10 @@ def selectWatershed(watershed):
         stations = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_sites.shp'
         elev_tiff = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data.tif'
         dem = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data.tif'
-        view_factor = ''
+        view_factor = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data_vf.tif'
         db = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo.db'
         data['sql_ph'] = '?'
-        return stations, elev_tiff, dem, view_factor, db
+    return stations, elev_tiff, dem, view_factor, db
 
 def ConnectDB(db, username = 'root', passwd = ''):
     '''connect to MySQL database'''
@@ -102,13 +102,11 @@ def ConnectDB(db, username = 'root', passwd = ''):
         cnx = sqlite3.connect(db)
         return cnx
 
-
 def ParameterList(param_dict, rows, table_type):
     '''Append all data to the end of the parameter list'''
     if table_type == 'climate':
         for row in rows:
             if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'TESTING':
-                print data['watershed']
                 param_dict['site_key'].append(row[0])
                 param_dict['date_time'].append(row[1])
                 param_dict['air_temperature'].append(row[8])
@@ -1069,14 +1067,15 @@ def main():
             to_date_temp = date_increment + delta
             to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
             query = ('SELECT * FROM precipitation WHERE '\
-                    'date_time >= "' + from_date + '" '\
-                    'AND date_time < "' + to_date + '";')
+                    'date_time >= ' + data['sql_ph'] + ' '\
+                    'AND date_time < ' + data['sql_ph'] + ';')
             cur = db_cnx.cursor()
-            cur.execute(query)
-            i_num_return = cur.rowcount
+            cur.execute(query, (from_date, to_date))
+            rows = cur.fetchall()
+            i_num_return = len(rows)
             arcpy.AddMessage('Query: ' + query)
             arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
-            parameters = ParameterList(parameters, cur, table_type = 'precip')
+            parameters = ParameterList(parameters, rows, table_type = 'precip')
             cur.close()
             
             precip_table = BuildClimateTable(parameters, i_num_return)
@@ -1100,14 +1099,15 @@ def main():
             to_date_temp = date_increment + delta
             to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
             query = ('SELECT * FROM soil_temperature WHERE '\
-                    'date_time >= "' + from_date + '" '\
-                    'AND date_time < "' + to_date + '";')
+                    'date_time >= ' + data['sql_ph'] + ' '\
+                    'AND date_time < ' + data['sql_ph'] + ';')
             cur = db_cnx.cursor()
-            cur.execute(query)
-            i_num_return = cur.rowcount
+            cur.execute(query, (from_date, to_date))
+            rows = cur.fetchall()
+            i_num_return = len(rows)
             arcpy.AddMessage('Query: ' + query)
             arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
-            parameters = ParameterList(parameters, cur, table_type = 'soil_temperature')
+            parameters = ParameterList(parameters, rows, table_type = 'soil_temperature')
             cur.close()
             
             soil_table = BuildClimateTable(parameters, i_num_return)
@@ -1133,15 +1133,16 @@ def main():
                 'zs': []
                 }
         query = ('SELECT * FROM snow_depth WHERE '\
-                'date_time >= "' + from_date + '" '\
-                'AND date_time < "' + to_date + '";')
+                'date_time >= ' + data['sql_ph'] + ' '\
+                'AND date_time < ' + data['sql_ph'] + ';')
         cur = db_cnx.cursor()
-        cur.execute(query)
-        i_num_return = cur.rowcount
+        cur.execute(query, (from_date, to_date))
+        rows = cur.fetchall()
+        i_num_return = len(rows)
         arcpy.AddMessage('Query: ' + query)
         arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
         #Build parameter lists into dictionary
-        parameters = ParameterList(parameters, cur, table_type = 'snow_depth')
+        parameters = ParameterList(parameters, rows, table_type = 'snow_depth')
         cur.close()
         #Build Climate table
         snow_table = BuildClimateTable(parameters, i_num_return)
@@ -1199,7 +1200,7 @@ if __name__ == '__main__':
     data.update({'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
         'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
         'bool_air_temperature': True, 
-        'bool_vapor_pressure': False, 
+        'bool_vapor_pressure': True, 
         'to_date': u'2014-01-01 13:00:00', 
         'time_step': 1, 
         'bool_soil_temperature': False, 
@@ -1213,10 +1214,10 @@ if __name__ == '__main__':
         'bool_precip_mass': False, 
         'bool_wind_speed': False, 
         'kriging_method': u'Empirical Bayesian', 
-        'bool_thermal_radiation': False, 
+        'bool_thermal_radiation': True, 
         'bool_constants': False, 
         'bool_snow_properties': False, 
-        'watershed': u'TESTING', 
+        'watershed': u'TESTING',
         'bool_snow_depth': False, 
         'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
         })
