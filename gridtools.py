@@ -6,8 +6,11 @@ import csv
 import traceback
 import numpy
 #from scipy import stats
-import mysql.connector
-from mysql.connector import errorcode
+try: 
+    import mysql.connector
+    from mysql.connector import errorcode
+except ImportError:
+    print('No MySQL support.  Use SQLite database or install MySQL')
 import sqlite3
 import datetime
 import json
@@ -175,7 +178,7 @@ def BuildClimateTable(params, num):
             row.setValue(keys[k], params[keys[k]][j])
         in_cursor.insertRow(row)
     del in_cursor
-    del row
+##     del row
     return table
 
 def DataTable(parameter, data_table, multi_fields = []):
