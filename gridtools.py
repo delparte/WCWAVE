@@ -58,26 +58,29 @@ def selectWatershed(watershed):
     
     if watershed == 'Johnston Draw':
         arcpy.AddMessage('Johnston Draw Watershed')
-        stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations_JD'
-        elev_tiff = r'C:\ReynoldsCreek\jd_elevation_filled.tif'
-        dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\JD_DEM_10m'
-        view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\JD_ViewFactor_10m' 
+        base_path = r'C:\ReynoldsCreek'
+        stations = r'{0}\Relevant_Data.gdb\station_locations_JD'.format(base_path)
+        elev_tiff = r'{0}\jd_elevation_filled.tif'.format(base_path)
+        dem = r'{0}\Relevant_Data.gdb\JD_DEM_10m'.format(base_path)
+        view_factor = r'{0}\Relevant_Data.gdb\JD_ViewFactor_10m'.format(base_path)
         db = 'jd_data'
     
     elif watershed == 'Reynolds Creek':
         arcpy.AddMessage('Reynolds Creek Watershed')
-        stations = r'C:\ReynoldsCreek\Relevant_Data.gdb\station_locations'
-        elev_tiff = r'C:\ReynoldsCreek\rc_elevation_filled.tif'
-        dem = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_DEM_10m_South'
-        view_factor = r'C:\ReynoldsCreek\Relevant_Data.gdb\RC_ViewFactor_10M_South'
+        base_path = r'C:\ReynoldsCreek'
+        stations = r'{0}\Relevant_Data.gdb\station_locations'.format(base_path)
+        elev_tiff = r'{0}\rc_elevation_filled.tif'.format(base_path)
+        dem = r'{0}\Relevant_Data.gdb\RC_DEM_10m_South'.format(base_path)
+        view_factor = r'{0}\Relevant_Data.gdb\RC_ViewFactor_10M_South'.format(base_path)
         db = 'rc_data'
     elif watershed == 'TESTING':
         arcpy.AddMessage('Testing watershed')
-        stations = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_sites.shp'
-        elev_tiff = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data.tif'
-        dem = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data.tif'
-        view_factor = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo_data_vf.tif'
-        db = r'C:\ReynoldsCreek\PythonScripts\Python_Scripts\WCWAVE\demo_data\demo.db'
+        base_path = r'C:\Students\chaptuck\WCWAVE-master\demo_data'
+        stations = '{0}\demo_sites.shp'.format(base_path)
+        elev_tiff = '{0}\demo_data.tif'.format(base_path)
+        dem = '{0}\demo_data.tif'.format(base_path)
+        view_factor = '{0}\demo_data_vf.tif'.format(base_path)
+        db = '{0}\demo.db'.format(base_path)
         data['sql_ph'] = '?'
     return stations, elev_tiff, dem, view_factor, db
 
@@ -1176,54 +1179,54 @@ def main():
 
 if __name__ == '__main__':
     #Dictionary to hold all user input data.  
-##     data.update({'watershed' : arcpy.GetParameterAsText(0),
-##         'from_date' : arcpy.GetParameterAsText(1),
-##         'to_date' : arcpy.GetParameterAsText(2),
-##         'time_step' : int(arcpy.GetParameterAsText(3)),
-##         'kriging_method' : arcpy.GetParameterAsText(4),
-##         'bool_all_tools' : arcpy.GetParameter(5),
-##         'bool_air_temperature' : arcpy.GetParameter(6),
-##         'bool_constants' : arcpy.GetParameter(7),
-##         'rl_constant' : arcpy.GetParameter(8),
-##         'h2o_constant' : arcpy.GetParameter(9),
-##         'bool_dew_point' : arcpy.GetParameter(10),
-##         'bool_precip_mass' : arcpy.GetParameter(11),
-##         'bool_snow_depth' : arcpy.GetParameter(12),
-##         'bool_snow_properties' : arcpy.GetParameter(13),
-##         'll_interp_values' : json.loads(arcpy.GetParameter(14).JSON),
-##         'ul_interp_values' : json.loads(arcpy.GetParameter(15).JSON),
-##         'density_interp_values' : json.loads(arcpy.GetParameter(16).JSON),
-##         'bool_soil_temperature' : arcpy.GetParameter(17),
-##         'bool_solar_radiation' : arcpy.GetParameter(18),
-##         'bool_thermal_radiation' : arcpy.GetParameter(19),
-##         'bool_vapor_pressure' : arcpy.GetParameter(20),
-##         'bool_wind_speed' : arcpy.GetParameter(21)
-##     })
+    data.update({'watershed' : arcpy.GetParameterAsText(0),
+        'from_date' : arcpy.GetParameterAsText(1),
+        'to_date' : arcpy.GetParameterAsText(2),
+        'time_step' : int(arcpy.GetParameterAsText(3)),
+        'kriging_method' : arcpy.GetParameterAsText(4),
+        'bool_all_tools' : arcpy.GetParameter(5),
+        'bool_air_temperature' : arcpy.GetParameter(6),
+        'bool_constants' : arcpy.GetParameter(7),
+        'rl_constant' : arcpy.GetParameter(8),
+        'h2o_constant' : arcpy.GetParameter(9),
+        'bool_dew_point' : arcpy.GetParameter(10),
+        'bool_precip_mass' : arcpy.GetParameter(11),
+        'bool_snow_depth' : arcpy.GetParameter(12),
+        'bool_snow_properties' : arcpy.GetParameter(13),
+        'll_interp_values' : json.loads(arcpy.GetParameter(14).JSON),
+        'ul_interp_values' : json.loads(arcpy.GetParameter(15).JSON),
+        'density_interp_values' : json.loads(arcpy.GetParameter(16).JSON),
+        'bool_soil_temperature' : arcpy.GetParameter(17),
+        'bool_solar_radiation' : arcpy.GetParameter(18),
+        'bool_thermal_radiation' : arcpy.GetParameter(19),
+        'bool_vapor_pressure' : arcpy.GetParameter(20),
+        'bool_wind_speed' : arcpy.GetParameter(21)
+    })
     
-    data.update({'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
-        'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
-        'bool_air_temperature': True, 
-        'bool_vapor_pressure': True, 
-        'to_date': u'2014-01-01 13:00:00', 
-        'time_step': 1, 
-        'bool_soil_temperature': False, 
-        'rl_constant': 0.005, 
-        'from_date': u'2014-01-01 12:00:00', 
-        'bool_solar_radiation': False, 
-        'bool_all_tools': False, 
-        'h2o_constant': 0.2, 
-        'db': 'jd_data', 
-        'bool_dew_point': False, 
-        'bool_precip_mass': False, 
-        'bool_wind_speed': False, 
-        'kriging_method': u'Empirical Bayesian', 
-        'bool_thermal_radiation': True, 
-        'bool_constants': False, 
-        'bool_snow_properties': False, 
-        'watershed': u'TESTING',
-        'bool_snow_depth': False, 
-        'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
-        })
+##     data.update({'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
+##         'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
+##         'bool_air_temperature': True, 
+##         'bool_vapor_pressure': True, 
+##         'to_date': u'2014-01-01 13:00:00', 
+##         'time_step': 1, 
+##         'bool_soil_temperature': False, 
+##         'rl_constant': 0.005, 
+##         'from_date': u'2014-01-01 12:00:00', 
+##         'bool_solar_radiation': False, 
+##         'bool_all_tools': False, 
+##         'h2o_constant': 0.2, 
+##         'db': 'jd_data', 
+##         'bool_dew_point': False, 
+##         'bool_precip_mass': False, 
+##         'bool_wind_speed': False, 
+##         'kriging_method': u'Empirical Bayesian', 
+##         'bool_thermal_radiation': True, 
+##         'bool_constants': False, 
+##         'bool_snow_properties': False, 
+##         'watershed': u'TESTING',
+##         'bool_snow_depth': False, 
+##         'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
+##         })
     main()
 ##     import cProfile
 ##     import pstats
