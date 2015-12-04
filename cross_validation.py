@@ -158,12 +158,13 @@ def main():
             to_date_temp = date_increment + delta
             to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
             query = ('SELECT * FROM weather WHERE '\
-                    'date_time >= "' + from_date + '" '\
-                    'AND date_time < "' + to_date + '"')
+                    'date_time >= ' + grids.data['sql_ph'] + ' '\
+                    'AND date_time < ' + grids.data['sql_ph'] + '')
             cur = db_cnx.cursor()
-            cur.execute(query)
-            i_num_return = cur.rowcount
-            parameters = grids.ParameterList(parameters, cur, table_type = 'climate')
+            cur.execute(query, (from_date, to_date))
+            rows = cur.fetchall()
+            i_num_return = len(rows)
+            parameters = grids.ParameterList(parameters, rows, table_type = 'climate')
             obs_parameters = parameters
             print obs_parameters
             cur.close()
@@ -189,13 +190,15 @@ def main():
                     'wind_direction' : []
                     }
                 query = ('SELECT * FROM weather WHERE '\
-                        'date_time >= "' + from_date + '" '\
-                        'AND date_time < "' + to_date + '" '\
-                        'AND Site_Key <> "' + site + '"')
+                        'date_time >= ' + grids.data['sql_ph'] + ' '\
+                        'AND date_time < ' + grids.data['sql_ph'] + ' '\
+                        'AND Site_Key <> ' + grids.data['sql_ph'] + '')
                 cur = db_cnx.cursor()
-                cur.execute(query)
-                i_num_return = cur.rowcount
-                parameters = grids.ParameterList(parameters,cur,table_type = 'climate')
+                cur.execute(query, (from_date, to_date, site))
+                rows = cur.fetchall()
+                i_num_return = len(rows)
+                arcpy.AddMessage('Number of rows: '.format(i_num_return))
+                parameters = grids.ParameterList(parameters,rows,table_type = 'climate')
                 cur.close()
                 
                 # Build Climate table
@@ -285,7 +288,7 @@ if __name__ == '__main__':
         'from_date' : arcpy.GetParameterAsText(1),
         'to_date' : arcpy.GetParameterAsText(2),
         'time_step' : int(arcpy.GetParameterAsText(3)),
-        'kiriging_method' : arcpy.GetParameterAsText(4),
+        'kriging_method' : arcpy.GetParameterAsText(4),
         'bool_air_temperature' : arcpy.GetParameter(5),
         'bool_dew_point' : arcpy.GetParameter(6),
         'bool_vapor_pressure': arcpy.GetParameter(7)
