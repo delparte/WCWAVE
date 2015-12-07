@@ -3,11 +3,10 @@ import datetime
 import time
 import math
 import numpy as np
+import os
 
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append('..') # Used to import the gridtools.py for use in this script
 import gridtools as grids
 
 arcpy.env.parallelProcessingFactor = '100%'
@@ -83,21 +82,31 @@ def GraphRegression(time_stamp='test', param_type = 'test',
     plt.savefig('{0}\{1}_scatter_{2}.png'.format(grids.outFolder,param_type, time_stamp))
     plt.clf()
 
-def PrintDataToCSV(parameter, sites_names=['test'], modeled_values=[1], observed_values=[2], time_values=[3]):
-    filename = open('{0}\Output_{1}.txt'.format(grids.outFolder, parameter), 'a')
-    filename.write('site_key,modeled_value,observed_value,time_to_create (s)\n')
+def PrintDataToCSV(parameter, date_value, sites_names=['test'], modeled_values=[1], observed_values=[2], time_values=[3]):
+    out_file_name = '{0}\Output_{1}.txt'.format(grids.outFolder, parameter)
+
+    # If file does not exists write headers.
+    if os.path.isfile(out_file_name):
+        filename = open(out_file_name, 'a')
+    else: 
+        filename = open(out_file_name, 'a')
+        filename.write('site_key,date,modeled_value,observed_value,time_to_create (s)\n')
+    
+    # Write data to file
     for i in range(len(sites_names)):
-        string = '{0},{1},{2},{3},\n'.format(sites_names[i],modeled_values[i],observed_values[i], time_values[i])
+        string = '{0},{1},{2},{3},{4},\n'.format(sites_names[i],date_value, modeled_values[i],observed_values[i], time_values[i])
         filename.write(string)
     
 
 def main():
+    # Initialize datetime, watershed, and database variables
+    # ===============================================================
     from_date_round = datetime.datetime.strptime(grids.data['from_date'], '%Y-%m-%d %H:%M:%S')
     to_date_round = datetime.datetime.strptime(grids.data['to_date'], '%Y-%m-%d %H:%M:%S')
     grids.data['from_date'] = grids.roundTime(from_date_round, 60*60)
     grids.data['to_date'] = grids.roundTime(to_date_round)
     
-    return_ws = grids.selectWatershed(grids.data['watershed'])
+    return_ws = grids.selectWatershed(grids.data['watershed']) # Necessary rasters and vector data 
     grids.data.update({'stations' : return_ws[0],
         'elev_tiff' : return_ws[1],
         'dem' : return_ws[2],
@@ -105,12 +114,13 @@ def main():
         'db' : return_ws[4]
         })
     
-    db_cnx = grids.ConnectDB(grids.data['db'])
-    # Scratch and output lists
+    db_cnx = grids.ConnectDB(grids.data['db']) # Database connection
     ls_scratch_data = []
     ls_output = []
     
-    #Master stations feature class to be copied for each gridding function
+    # Master stations feature class to be copied for each gridding function
+    #    Stations with elevation and station locations
+    # =====================================================================
     grids.data.update({'fc_stations_elev': grids.data['scratch_gdb'] + '/stations_wElev'})
     ls_scratch_data.append(grids.data['fc_stations_elev'])
     grids.data.update({'station_locations' : grids.data['scratch_gdb'] + '/station_locations'})
@@ -123,23 +133,36 @@ def main():
         'ext_elev' : arcpy.Describe(grids.data['dem']).extent
         })
     arcpy.env.extent = grids.data['ext_elev']
-    
+
+    # Extract elevations from dem and add to station locations 
     arcpy.sa.ExtractValuesToPoints(in_point_features = grids.data['station_locations'],
             in_raster = grids.data['dem'],
             out_point_features = grids.data['fc_stations_elev'],
             interpolate_values = 'NONE',
             add_attributes = 'VALUE_ONLY')
+
+    # Setup for while loop increments. Create delta variable.  
+    #    Create station lists to iterate through
+    # ===============================================================
     delta = datetime.timedelta(hours=grids.data['time_step'])
     date_increment = grids.data['from_date']
     print grids.data['fc_stations_elev']
     scursor = arcpy.SearchCursor(grids.data['fc_stations_elev'])
     station_welevation = []
-    for row in scursor:
+    for row in scursor: # Station list for iteration
         station = row.getValue('Site_Key')
         station_welevation.append(station)
+
+    # While loop run for every time step between from data and to date.
+    # ==================================================================
     while date_increment < grids.data['to_date']:
-        arcpy.AddMessage(date_increment)
-        if any([grids.data['bool_air_temperature']]):
+        arcpy.AddMessage(date_increment) # Print date of current time step
+        
+        # Air Temp, dew point, or vapor pressure.
+        # =======================================
+        if any([grids.data['bool_air_temperature'], 
+            grids.data['bool_dew_point'], 
+            grids.data['bool_vapor_pressure']]):
             ls_scratch_data_imd = []
             
             parameters = {'site_key' : [],
@@ -152,7 +175,8 @@ def main():
                     'wind_direction' : []
                     }
             
-            # query climate (weather) table
+            # query climate (weather) table to get all sites with elevation and data
+            # =====================================================================
             from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
             time_stamp = date_increment.strftime('%Y%m%d_%H')
             to_date_temp = date_increment + delta
@@ -169,7 +193,7 @@ def main():
             print obs_parameters
             cur.close()
             
-            # get sites then reset parameters dictionary
+            # Populate a list of sites with necessary data.
             sites_list = []
             for st in parameters['site_key']:
                 if st in station_welevation:
@@ -178,6 +202,9 @@ def main():
             observed = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
             modeled = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []} 
             create_time = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
+            
+            # Iterate through sites_list leaving one site out per iteration.
+            # ===============================================================
             for site in sites_list:
                 arcpy.AddMessage('Leave out {0}'.format(site))
                 parameters = {'site_key' : [],
@@ -204,9 +231,13 @@ def main():
                 # Build Climate table
                 climate_table = grids.BuildClimateTable(parameters, i_num_return)
                 ls_scratch_data_imd.append(climate_table)
+                
                 # Run interpolation tools
-                start = time.time()
+                #    Interpolates data, Retrieves observed data, 
+                #    retrieves modeled data, and creation time.
+                # ======================================================
                 if grids.data['bool_air_temperature']:
+                    start = time.time()
                     path_air_temp = grids.AirTemperature(climate_table, time_stamp)
                     point_error = LeaveOneOutValue(raster = path_air_temp, 
                             site_toget = site,
@@ -214,10 +245,10 @@ def main():
                     obs_point = ObservedValue(obs_parameters, 'air_temperature', site)
                     modeled['air_temperature'].append(point_error)
                     observed['air_temperature'].append(obs_point)
-                end_air = time.time()
-                create_time['air_temperature'].append(end_air - start)
-                start = time.time()
+                    end_air = time.time()
+                    create_time['air_temperature'].append(end_air - start)
                 if grids.data['bool_dew_point']:
+                    start = time.time()
                     path_dew_point = grids.DewPoint(climate_table, time_stamp)
                     point_error = LeaveOneOutValue(raster = path_dew_point,
                             site_toget = site,
@@ -225,40 +256,47 @@ def main():
                     obs_point = ObservedValue(obs_parameters, 'dew_point', site)
                     modeled['dew_point'].append(point_error)
                     observed['dew_point'].append(obs_point)
-                end_dew = time.time()
-                create_time['dew_point'].append(end_dew - start)
+                    end_dew = time.time()
+                    create_time['dew_point'].append(end_dew - start)
                 if grids.data['bool_vapor_pressure']:
-                    path_vapor_pressure = grids.DewPoint(climate_table, time_stamp)
+                    start = time.time()
+                    path_vapor_pressure = grids.VaporPressure(climate_table, time_stamp)
                     point_error = LeaveOneOutValue(raster = path_vapor_pressure,
                             site_toget = site,
                             station_locations = grids.data['station_locations'])
                     obs_point = ObservedValue(obs_parameters, 'vapor_pressure', site)
                     modeled['vapor_pressure'].append(point_error)
                     observed['vapor_pressure'].append(obs_point)
-                end_dew = time.time()
-                create_time['vapor_pressure'].append(end_dew - start)
+                    end_dew = time.time()
+                    create_time['vapor_pressure'].append(end_dew - start)
+                # END INTERPOLATION
+                # ========================================================
+
+            # Graph results and print to Output_[PARAM].txt
+            # =====================================================
             if grids.data['bool_air_temperature']:
                 GraphRegression(time_stamp = time_stamp,
                         label = sites_list,
                         param_type = 'T_a',
                         x = modeled['air_temperature'],
                         y = observed['air_temperature'])
-                PrintDataToCSV('air_temp', sites_list, modeled['air_temperature'], observed['air_temperature'], create_time['air_temperature'])
+                PrintDataToCSV('air_temp', date_increment, sites_list, modeled['air_temperature'], observed['air_temperature'], create_time['air_temperature'])
             if grids.data['bool_dew_point']:
                 GraphRegression(time_stamp = time_stamp,
                         label = sites_list,
                         param_type = 'T_pp',
                         x = modeled['dew_point'],
                         y = observed['dew_point'])
-                PrintDataToCSV('dew_point', sites_list, modeled['dew_point'], observed['dew_point'], create_time['dew_point'])
+                PrintDataToCSV('dew_point', date_increment, sites_list, modeled['dew_point'], observed['dew_point'], create_time['dew_point'])
             if grids.data['bool_vapor_pressure']:
                 GraphRegression(time_stamp = time_stamp,
                         label = sites_list,
                         param_type = 'e_a',
                         x = modeled['vapor_pressure'],
                         y = observed['vapor_pressure'])
-                PrintDataToCSV('vapor_pressure', sites_list, modeled['vapor_pressure'], observed['vapor_pressure'], create_time['vapor_pressure'])
-
+                PrintDataToCSV('vapor_pressure', date_increment, sites_list, modeled['vapor_pressure'], observed['vapor_pressure'], create_time['vapor_pressure'])
+            # END GRAPHING
+            # ======================================================
 
 ##         GraphRegression()
             
@@ -266,6 +304,8 @@ def main():
 
 
 if __name__ == '__main__':
+##     # Initialize data variables for Reynolds Creek run.
+##     # ========================================================
 ##     grids.data.update({'from_date' : u'2007-12-01 00:00:00',
 ##         'to_date' : u'2007-12-03 00:00:00',
 ##         'bool_air_temperature' : True,
@@ -275,22 +315,40 @@ if __name__ == '__main__':
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
 ##         })
+##
+    # Initialize data variables for Johnston Draw run.
+    # =========================================================
+    grids.data.update({'from_date' : u'2014-01-01 12:00:00',
+        'to_date' : u'2014-01-01 14:00:00',
+        'bool_air_temperature' : True,
+        'bool_dew_point': False,
+        'bool_vapor_pressure': False,
+        'watershed' : 'Johnston Draw',
+        'time_step' : 1,
+        'kriging_method' : 'Empirical Bayesian'
+        })
+##
+##     # Initialize data variables for TESTING run.
+##     # =========================================================
 ##     grids.data.update({'from_date' : u'2014-01-01 12:00:00',
 ##         'to_date' : u'2014-01-01 13:00:00',
 ##         'bool_air_temperature' : True,
-##         'bool_dew_point': False,
-##         'bool_vapor_pressure': False,
+##         'bool_dew_point': True,
+##         'bool_vapor_pressure': True,
 ##         'watershed' : 'TESTING',
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
 ##         })
-    grids.data.update({'watershed' : arcpy.GetParameterAsText(0),
-        'from_date' : arcpy.GetParameterAsText(1),
-        'to_date' : arcpy.GetParameterAsText(2),
-        'time_step' : int(arcpy.GetParameterAsText(3)),
-        'kriging_method' : arcpy.GetParameterAsText(4),
-        'bool_air_temperature' : arcpy.GetParameter(5),
-        'bool_dew_point' : arcpy.GetParameter(6),
-        'bool_vapor_pressure': arcpy.GetParameter(7)
-        })
+##
+##     # Initialize data variables for ArcMap run.
+##     # =========================================================
+##     grids.data.update({'watershed' : arcpy.GetParameterAsText(0),
+##         'from_date' : arcpy.GetParameterAsText(1),
+##         'to_date' : arcpy.GetParameterAsText(2),
+##         'time_step' : int(arcpy.GetParameterAsText(3)),
+##         'kriging_method' : arcpy.GetParameterAsText(4),
+##         'bool_air_temperature' : arcpy.GetParameter(5),
+##         'bool_dew_point' : arcpy.GetParameter(6),
+##         'bool_vapor_pressure': arcpy.GetParameter(7)
+##         })
     main()
