@@ -75,7 +75,8 @@ def selectWatershed(watershed):
         db = 'rc_data'
     elif watershed == 'TESTING':
         arcpy.AddMessage('Testing watershed')
-        base_path = r'C:\Students\chaptuck\WCWAVE-master\demo_data'
+        file_path = os.path.dirname(os.path.abspath(__file__))
+        base_path = r'{0}\demo_data'.format(file_path)
         stations = '{0}\demo_sites.shp'.format(base_path)
         elev_tiff = '{0}\demo_data.tif'.format(base_path)
         dem = '{0}\demo_data.tif'.format(base_path)
