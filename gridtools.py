@@ -133,7 +133,7 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['wind_direction'].append(row[15])
     elif table_type == 'precip':
         for row in rows:
-            if data['watershed'] == 'Johnston Draw':
+            if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'TESTING':
                 param_dict['site_key'].append(row[0])
                 param_dict['ppts'].append(row[2])
                 param_dict['pptu'].append(row[3])
@@ -150,7 +150,7 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['stm005'].append(row[3]) # column 3 is soil temp at 5 cm depth
     elif table_type == 'snow_depth':
         for row in rows:
-            if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek':
+            if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek' or data['watershed'] == 'TESTING':
                 param_dict['site_key'].append(row[0])
                 param_dict['zs'].append(row[8])
     return param_dict

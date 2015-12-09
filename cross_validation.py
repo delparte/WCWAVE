@@ -26,7 +26,7 @@ def ObservedValue(sites_data, parameter, site_toget):
     arcpy.AddMessage('Get observed value from table')
     index = 0
     for name in sites_data['site_key']:
-        if name == site_toget:
+        if name == str(site_toget):
             obs_value = sites_data[parameter][index]
         index += 1
     return obs_value
@@ -59,14 +59,16 @@ def GraphRegression(time_stamp='test', param_type = 'test',
         point_color = 'green'
     elif param_type == 'e_a':
         point_color = 'red'
-    elif param_type == 'ppts':
+    elif param_type == 'm_pp':
         point_color = 'blue'
-    elif param_type == 'zs':
+    elif param_type == 'z_s':
         point_color = 'yellow'
-
-    trendline = np.polyfit(x, y, 1)
-    p = np.poly1d(trendline)
-    plt.plot(x, p(x), 'k-')
+    #
+    x_y_line = [min(x), max(x)]
+    y_values = x_y_line
+    #trendline = np.polyfit(x, y, 1)
+    #p = np.poly1d(trendline)
+    plt.plot(x_y_line, y_values, 'k-')
     
     plt.title('{0} for {1}; RMSE={2}; MAE={3}'.format(param_type, time_stamp,rmse, mae))
     plt.scatter(x,y,s=z, c=point_color)
@@ -158,12 +160,12 @@ def main():
     while date_increment < grids.data['to_date']:
         arcpy.AddMessage(date_increment) # Print date of current time step
         
+        ls_scratch_data_imd = []
         # Air Temp, dew point, or vapor pressure.
         # =======================================
         if any([grids.data['bool_air_temperature'], 
             grids.data['bool_dew_point'], 
             grids.data['bool_vapor_pressure']]):
-            ls_scratch_data_imd = []
             
             parameters = {'site_key' : [],
                     'date_time' : [],
@@ -190,13 +192,12 @@ def main():
             i_num_return = len(rows)
             parameters = grids.ParameterList(parameters, rows, table_type = 'climate')
             obs_parameters = parameters
-            print obs_parameters
             cur.close()
             
             # Populate a list of sites with necessary data.
             sites_list = []
             for st in parameters['site_key']:
-                if st in station_welevation:
+                if st in station_welevation and st not in sites_list:
                     sites_list.append(st)
             print 'sites_lists len: {0}'.format(len(sites_list))
             observed = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
@@ -247,6 +248,7 @@ def main():
                     observed['air_temperature'].append(obs_point)
                     end_air = time.time()
                     create_time['air_temperature'].append(end_air - start)
+                    ls_scratch_data_imd.append(path_air_temp)
                 if grids.data['bool_dew_point']:
                     start = time.time()
                     path_dew_point = grids.DewPoint(climate_table, time_stamp)
@@ -258,6 +260,7 @@ def main():
                     observed['dew_point'].append(obs_point)
                     end_dew = time.time()
                     create_time['dew_point'].append(end_dew - start)
+                    ls_scratch_data_imd.append(path_dew_point)
                 if grids.data['bool_vapor_pressure']:
                     start = time.time()
                     path_vapor_pressure = grids.VaporPressure(climate_table, time_stamp)
@@ -269,6 +272,7 @@ def main():
                     observed['vapor_pressure'].append(obs_point)
                     end_dew = time.time()
                     create_time['vapor_pressure'].append(end_dew - start)
+                    ls_scratch_data_imd.append(path_vapor_pressure)
                 # END INTERPOLATION
                 # ========================================================
 
@@ -280,53 +284,253 @@ def main():
                         param_type = 'T_a',
                         x = modeled['air_temperature'],
                         y = observed['air_temperature'])
-                PrintDataToCSV('air_temp', date_increment, sites_list, modeled['air_temperature'], observed['air_temperature'], create_time['air_temperature'])
+                PrintDataToCSV('air_temp',
+                        date_increment,
+                        sites_list,
+                        modeled['air_temperature'],
+                        observed['air_temperature'],
+                        create_time['air_temperature'])
             if grids.data['bool_dew_point']:
                 GraphRegression(time_stamp = time_stamp,
                         label = sites_list,
                         param_type = 'T_pp',
                         x = modeled['dew_point'],
                         y = observed['dew_point'])
-                PrintDataToCSV('dew_point', date_increment, sites_list, modeled['dew_point'], observed['dew_point'], create_time['dew_point'])
+                PrintDataToCSV('dew_point', 
+                        date_increment, 
+                        sites_list, 
+                        modeled['dew_point'], 
+                        observed['dew_point'], 
+                        create_time['dew_point'])
             if grids.data['bool_vapor_pressure']:
                 GraphRegression(time_stamp = time_stamp,
                         label = sites_list,
                         param_type = 'e_a',
                         x = modeled['vapor_pressure'],
                         y = observed['vapor_pressure'])
-                PrintDataToCSV('vapor_pressure', date_increment, sites_list, modeled['vapor_pressure'], observed['vapor_pressure'], create_time['vapor_pressure'])
+                PrintDataToCSV('vapor_pressure',
+                        date_increment, 
+                        sites_list, 
+                        modeled['vapor_pressure'],
+                        observed['vapor_pressure'],
+                        create_time['vapor_pressure'])
             # END GRAPHING
             # ======================================================
+        # Precipitation Mass
+        # ========================================
+        if any([grids.data['bool_precip_mass']]):
+            parameters = {'site_key': [],
+                'ppts' : [],
+                'pptu' : [],
+                'ppta' : []}
 
-##         GraphRegression()
+            # query precipitation table to get all sites with elevation and data
+            # =====================================================================
+            from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
+            time_stamp = date_increment.strftime('%Y%m%d_%H')
+            to_date_temp = date_increment + delta
+            to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
+            query = ('SELECT * FROM precipitation WHERE '\
+                    'date_time >= ' + grids.data['sql_ph'] + ' '\
+                    'AND date_time < ' + grids.data['sql_ph'] + '')
+            cur = db_cnx.cursor()
+            cur.execute(query, (from_date, to_date))
+            rows = cur.fetchall()
+            i_num_return = len(rows)
+            parameters = grids.ParameterList(parameters, rows, table_type = 'precip')
+            obs_parameters = parameters
+            cur.close()
+
+            # Populate a list of sites with necessary data.
+            sites_list = []
+            for st in parameters['site_key']:
+                if st in station_welevation and st not in sites_list:
+                    sites_list.append(st)
+            print('Sites_list len: {0}'.format(len(sites_list)))
+            observed = {'precip' : []}
+            modeled = {'precip' : []}
+            create_time = {'precip' : []}
             
+            # Iterate through site_list leaving one site out per iteration.
+            # ==============================================================
+            for site in sites_list:
+                arcpy.AddMessage('Leave out {0}'.format(site))
+                parameters = {'site_key': [],
+                    'ppts' : [],
+                    'pptu' : [],
+                    'ppta' : []}
+
+                # query precipitation table to get all sites with elevation and data
+                # =====================================================================
+                from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
+                time_stamp = date_increment.strftime('%Y%m%d_%H')
+                to_date_temp = date_increment + delta
+                to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
+                query = ('SELECT * FROM precipitation WHERE '\
+                        'date_time >= ' + grids.data['sql_ph'] + ' '\
+                        'AND date_time < ' + grids.data['sql_ph'] + ' '\
+                        'AND Site_Key <> ' + grids.data['sql_ph'] + '')
+                cur = db_cnx.cursor()
+                cur.execute(query, (from_date, to_date, site))
+                rows = cur.fetchall()
+                i_num_return = len(rows)
+                parameters = grids.ParameterList(parameters, rows, table_type = 'precip')
+                cur.close()
+                 
+                # Build precipitation table
+                climate_table = grids.BuildClimateTable(parameters, i_num_return)
+                ls_scratch_data_imd.append(climate_table)
+                
+                if grids.data['bool_precip_mass']:
+                    start = time.time()
+                    path_precip_mass = grids.PrecipitationMass(climate_table, time_stamp)
+                    point_error = LeaveOneOutValue(raster = path_precip_mass, 
+                            site_toget = site,
+                            station_locations = grids.data['station_locations'])
+                    obs_point = ObservedValue(obs_parameters, 'ppts', site)
+                    modeled['precip'].append(point_error)
+                    observed['precip'].append(obs_point)
+                    end_precip = time.time()
+                    ls_scratch_data_imd.append(path_precip_mass)
+                    create_time['precip'].append(end_precip - start) 
+                # END PRECIP INTERPOLATION
+                # ===========================================================
+                
+            # Graph the results and print to Output_[PARAM].txt
+            # =====================================================
+            if grids.data['bool_precip_mass']:
+                GraphRegression(time_stamp = time_stamp,
+                        label = sites_list,
+                        param_type = 'm_pp',
+                        x = modeled['precip'],
+                        y = observed['precip'])
+                PrintDataToCSV('precip',
+                        date_increment,
+                        sites_list,
+                        modeled['precip'],
+                        observed['precip'],
+                        create_time['precip'])
+            # END Precip graphing and output
+            # =======================================================
+        if any([grids.data['bool_snow_depth']]):
+            parameters = {'site_key' : [],
+                    'zs': []}
+
+            # query snow_depth table to get all sites with elevation and data
+            # =====================================================================
+            from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
+            time_stamp = date_increment.strftime('%Y%m%d_%H')
+            to_date_temp = date_increment + delta
+            to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
+            query = ('SELECT * FROM snow_depth WHERE '\
+                    'date_time >= ' + grids.data['sql_ph'] + ' '\
+                    'AND date_time < ' + grids.data['sql_ph'] + '')
+            cur = db_cnx.cursor()
+            cur.execute(query, (from_date, to_date))
+            rows = cur.fetchall()
+            i_num_return = len(rows)
+            parameters = grids.ParameterList(parameters, rows, table_type = 'snow_depth')
+            obs_parameters = parameters
+            arcpy.AddMessage(obs_parameters)
+            cur.close()
+            
+            # Populate a list of sites with necessary data.
+            sites_list = []
+            for st in parameters['site_key']:
+                if st in station_welevation and st not in sites_list:
+                    sites_list.append(st)
+            print('Sites_list len: {0}'.format(len(sites_list)))
+            observed = {'snow_depth' : []}
+            modeled = {'snow_depth' : []}
+            create_time = {'snow_depth' : []}
+
+            for site in sites_list:
+                arcpy.AddMessage('Leave out {0}'.format(site))
+                parameters = {'site_key': [],
+                    'zs' : []}
+
+                # query precipitation table to get all sites with elevation and data
+                # =====================================================================
+                from_date = date_increment.strftime('%Y-%m-%d %H:%M:%S')
+                time_stamp = date_increment.strftime('%Y%m%d_%H')
+                to_date_temp = date_increment + delta
+                to_date = to_date_temp.strftime('%Y-%m-%d %H:%M:%S')
+                query = ('SELECT * FROM snow_depth WHERE '\
+                        'date_time >= ' + grids.data['sql_ph'] + ' '\
+                        'AND date_time < ' + grids.data['sql_ph'] + ' '\
+                        'AND Site_Key <> ' + grids.data['sql_ph'] + '')
+                cur = db_cnx.cursor()
+                cur.execute(query, (from_date, to_date, site))
+                rows = cur.fetchall()
+                i_num_return = len(rows)
+                parameters = grids.ParameterList(parameters, rows, table_type = 'snow_depth')
+                cur.close()
+                 
+                # Build precipitation table
+                climate_table = grids.BuildClimateTable(parameters, i_num_return)
+                ls_scratch_data_imd.append(climate_table)
+                
+                if grids.data['bool_snow_depth']:
+                    start = time.time()
+                    path_snow_depth = grids.SnowDepth(climate_table, time_stamp)
+                    point_error = LeaveOneOutValue(raster = path_snow_depth, 
+                            site_toget = site,
+                            station_locations = grids.data['station_locations'])
+                    obs_point = ObservedValue(obs_parameters, 'zs', site)
+                    modeled['snow_depth'].append(point_error)
+                    observed['snow_depth'].append(obs_point)
+                    end_snow = time.time()
+                    ls_scratch_data_imd.append(path_snow_depth)
+                    create_time['snow_depth'].append(end_snow - start) 
+                # END PRECIP INTERPOLATION
+                # ===========================================================
+            # Graph the results and print to Output_[PARAM].txt
+            # =====================================================
+            if grids.data['bool_snow_depth']:
+                GraphRegression(time_stamp = time_stamp,
+                        label = sites_list,
+                        param_type = 'z_s',
+                        x = modeled['snow_depth'],
+                        y = observed['snow_depth'])
+                PrintDataToCSV('snow_depth',
+                        date_increment,
+                        sites_list,
+                        modeled['snow_depth'],
+                        observed['snow_depth'],
+                        create_time['snow_depth'])
+            # END Precip graphing and output
+            # =======================================================
+
         date_increment += delta
+        grids.DeleteScratchData(ls_scratch_data_imd)
 
 
 if __name__ == '__main__':
 ##     # Initialize data variables for Reynolds Creek run.
 ##     # ========================================================
-##     grids.data.update({'from_date' : u'2007-12-01 00:00:00',
-##         'to_date' : u'2007-12-03 00:00:00',
-##         'bool_air_temperature' : True,
+##     grids.data.update({'from_date' : u'2007-12-03 23:00:00',
+##         'to_date' : u'2007-12-04 00:00:00',
+##         'bool_air_temperature' : False,
 ##         'bool_dew_point': False,
 ##         'bool_vapor_pressure': False,
+##         'bool_precip_mass': True,
 ##         'watershed' : 'Reynolds Creek',
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
 ##         })
 ##
-    # Initialize data variables for Johnston Draw run.
-    # =========================================================
-    grids.data.update({'from_date' : u'2014-01-01 12:00:00',
-        'to_date' : u'2014-01-01 14:00:00',
-        'bool_air_temperature' : True,
-        'bool_dew_point': False,
-        'bool_vapor_pressure': False,
-        'watershed' : 'Johnston Draw',
-        'time_step' : 1,
-        'kriging_method' : 'Empirical Bayesian'
-        })
+##     # Initialize data variables for Johnston Draw run.
+##     # =========================================================
+##     grids.data.update({'from_date' : u'2014-01-01 12:00:00',
+##         'to_date' : u'2014-01-01 14:00:00',
+##         'bool_air_temperature' : False,
+##         'bool_dew_point': False,
+##         'bool_vapor_pressure': False,
+##         'bool_precip_mass' : True,
+##         'watershed' : 'Johnston Draw',
+##         'time_step' : 1,
+##         'kriging_method' : 'Empirical Bayesian'
+##         })
 ##
 ##     # Initialize data variables for TESTING run.
 ##     # =========================================================
@@ -340,15 +544,17 @@ if __name__ == '__main__':
 ##         'kriging_method' : 'Empirical Bayesian'
 ##         })
 ##
-##     # Initialize data variables for ArcMap run.
-##     # =========================================================
-##     grids.data.update({'watershed' : arcpy.GetParameterAsText(0),
-##         'from_date' : arcpy.GetParameterAsText(1),
-##         'to_date' : arcpy.GetParameterAsText(2),
-##         'time_step' : int(arcpy.GetParameterAsText(3)),
-##         'kriging_method' : arcpy.GetParameterAsText(4),
-##         'bool_air_temperature' : arcpy.GetParameter(5),
-##         'bool_dew_point' : arcpy.GetParameter(6),
-##         'bool_vapor_pressure': arcpy.GetParameter(7)
-##         })
+    # Initialize data variables for ArcMap run.
+    # =========================================================
+    grids.data.update({'watershed' : arcpy.GetParameterAsText(0),
+        'from_date' : arcpy.GetParameterAsText(1),
+        'to_date' : arcpy.GetParameterAsText(2),
+        'time_step' : int(arcpy.GetParameterAsText(3)),
+        'kriging_method' : arcpy.GetParameterAsText(4),
+        'bool_air_temperature' : arcpy.GetParameter(5),
+        'bool_dew_point' : arcpy.GetParameter(6),
+        'bool_vapor_pressure': arcpy.GetParameter(7),
+        'bool_snow_depth': arcpy.GetParameter(8),
+        'bool_precip_mass': arcpy.GetParameter(9)
+        })
     main()
