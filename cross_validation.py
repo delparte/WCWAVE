@@ -46,7 +46,7 @@ def GraphRegression(time_stamp='test', param_type = 'test',
         abs_error.append(abs(y[i]-x[i]))
         sqr_error.append((y[i]-x[i])**2)
         z[i] = abs(z[i]) * 100
-    print z
+##     print z
     mae = sum(abs_error)/len(abs_error)
     mae = round(mae, 2)
     rmse = math.sqrt(sum(sqr_error)/len(sqr_error))
@@ -199,7 +199,7 @@ def main():
             for st in parameters['site_key']:
                 if st in station_welevation and st not in sites_list:
                     sites_list.append(st)
-            print 'sites_lists len: {0}'.format(len(sites_list))
+            arcpy.AddMessage('sites_lists : {0}'.format(sites_list))
             observed = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
             modeled = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []} 
             create_time = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
@@ -439,7 +439,7 @@ def main():
             for st in parameters['site_key']:
                 if st in station_welevation and st not in sites_list:
                     sites_list.append(st)
-            print('Sites_list len: {0}'.format(len(sites_list)))
+            print('Sites_list : {0}'.format(sites_list))
             observed = {'snow_depth' : []}
             modeled = {'snow_depth' : []}
             create_time = {'snow_depth' : []}
@@ -513,7 +513,8 @@ if __name__ == '__main__':
 ##         'bool_air_temperature' : False,
 ##         'bool_dew_point': False,
 ##         'bool_vapor_pressure': False,
-##         'bool_precip_mass': True,
+##         'bool_precip_mass': False,
+##         'bool_snow_depth' : True,
 ##         'watershed' : 'Reynolds Creek',
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
