@@ -153,7 +153,7 @@ def ParameterList(param_dict, rows, table_type):
             if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek' or data['watershed'] == 'TESTING':
                 param_dict['site_key'].append(row[0])
                 param_dict['zs'].append(row[-1])
-    arcpy.AddMessage(param_dict)
+    ##arcpy.AddMessage(param_dict)
     return param_dict
 
 def BuildClimateTable(params, num):

@@ -12,7 +12,7 @@ import gridtools as grids
 arcpy.env.parallelProcessingFactor = '100%'
 
 def LeaveOneOutValue(raster, station_locations, site_toget):
-    arcpy.AddMessage('Extracting leave one out value for {0}'.format(site_toget))
+    arcpy.AddMessage('Extracting modeled value for {0}'.format(site_toget))
     with arcpy.da.SearchCursor(in_table = station_locations, 
             field_names = ['Site_Key','SHAPE@XY']) as cursor:
         for row in cursor:
@@ -23,7 +23,7 @@ def LeaveOneOutValue(raster, station_locations, site_toget):
     return value
 
 def ObservedValue(sites_data, parameter, site_toget):
-    arcpy.AddMessage('Get observed value from table')
+    arcpy.AddMessage('Get observed value from table for {0}'.format(site_toget))
     index = 0
     for name in sites_data['site_key']:
         if name == str(site_toget):
@@ -36,8 +36,6 @@ def GraphRegression(time_stamp='test', param_type = 'test',
         x = [3.07, 3.49, 6.77, 3.87, 4.90, 4.64, 3.94, 4.93, 3.99, 4.46, 3.36], 
         y = [2.3, 3.1, 4.3, 5.3, 3.9, 5.2, 4.1, 5.0, 3.9, 5.3, 3.9] ):
     arcpy.AddMessage('Making {0} Graph'.format(param_type))
-    arcpy.AddMessage('X: {0}'.format(x))
-    arcpy.AddMessage('Y: {0}'.format(y))
     abs_error = []
     sqr_error = []
     z = []
@@ -158,7 +156,7 @@ def main():
     # While loop run for every time step between from data and to date.
     # ==================================================================
     while date_increment < grids.data['to_date']:
-        arcpy.AddMessage(date_increment) # Print date of current time step
+        arcpy.AddMessage('Current timestep: {0}\n'.format(date_increment)) # Print date of current time step
         
         ls_scratch_data_imd = []
         # Air Temp, dew point, or vapor pressure.
@@ -199,7 +197,7 @@ def main():
             for st in parameters['site_key']:
                 if st in station_welevation and st not in sites_list:
                     sites_list.append(st)
-            arcpy.AddMessage('sites_lists : {0}'.format(sites_list))
+            ## arcpy.AddMessage('sites_lists : {0}'.format(sites_list))
             observed = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
             modeled = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []} 
             create_time = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
@@ -225,7 +223,7 @@ def main():
                 cur.execute(query, (from_date, to_date, site))
                 rows = cur.fetchall()
                 i_num_return = len(rows)
-                arcpy.AddMessage('Number of rows: '.format(i_num_return))
+                ##arcpy.AddMessage('Number of rows: '.format(i_num_return))
                 parameters = grids.ParameterList(parameters,rows,table_type = 'climate')
                 cur.close()
                 
@@ -273,6 +271,7 @@ def main():
                     end_dew = time.time()
                     create_time['vapor_pressure'].append(end_dew - start)
                     ls_scratch_data_imd.append(path_vapor_pressure)
+                arcpy.AddMessage(' ') # Newline space for clarity
                 # END INTERPOLATION
                 # ========================================================
 
@@ -559,3 +558,4 @@ if __name__ == '__main__':
         'bool_precip_mass': arcpy.GetParameter(9)
         })
     main()
+    arcpy.AddMessage('\nAll Data found in {0}\n'.format(grids.data['out_folder']))
