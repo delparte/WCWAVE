@@ -526,7 +526,8 @@ if __name__ == '__main__':
 ##         'bool_air_temperature' : False,
 ##         'bool_dew_point': False,
 ##         'bool_vapor_pressure': False,
-##         'bool_precip_mass' : True,
+##         'bool_precip_mass': False,
+##         'bool_snow_depth' : True,
 ##         'watershed' : 'Johnston Draw',
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
@@ -536,15 +537,18 @@ if __name__ == '__main__':
 ##     # =========================================================
 ##     grids.data.update({'from_date' : u'2014-01-01 12:00:00',
 ##         'to_date' : u'2014-01-01 13:00:00',
-##         'bool_air_temperature' : True,
-##         'bool_dew_point': True,
-##         'bool_vapor_pressure': True,
+##         'bool_air_temperature' : False,
+##         'bool_dew_point': False,
+##         'bool_vapor_pressure': False,
+##         'bool_precip_mass': False,
+##         'bool_snow_depth' : True,
 ##         'watershed' : 'TESTING',
 ##         'time_step' : 1,
 ##         'kriging_method' : 'Empirical Bayesian'
 ##         })
 ##
     # Initialize data variables for ArcMap run.
+    # Comment and uncomment above to run as script
     # =========================================================
     grids.data.update({'watershed' : arcpy.GetParameterAsText(0),
         'from_date' : arcpy.GetParameterAsText(1),
@@ -558,4 +562,4 @@ if __name__ == '__main__':
         'bool_precip_mass': arcpy.GetParameter(9)
         })
     main()
-    arcpy.AddMessage('\nAll Data found in {0}\n'.format(grids.data['out_folder']))
+    arcpy.AddMessage('\nAll Data output to {0}\n'.format(grids.data['out_folder']))
