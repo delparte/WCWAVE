@@ -4,6 +4,10 @@ import time
 import math
 import numpy as np
 import os
+# modules required for the emailer
+import smtplib
+from email.MIMEMultipart import MIMEMultipart
+from email.MIMEText import MIMEText
 
 import matplotlib.pyplot as plt
 
@@ -97,6 +101,24 @@ def PrintDataToCSV(parameter, date_value, sites_names=['test'], modeled_values=[
         string = '{0},{1},{2},{3},{4},\n'.format(sites_names[i],date_value, modeled_values[i],observed_values[i], time_values[i])
         filename.write(string)
     
+def emailer():
+    from_addr = 'isu.wcwave@gmail.com'
+    to_addrs = 'tucker.r.chapman@gmail.com'
+
+    msg = MIMEMultipart()
+    msg['From'] = from_addr
+    msg['To'] = to_addrs
+    msg['Subject'] = 'Job Complete'
+    message = 'One of the programs is complete'
+    msg.attach(MIMEText(message))
+
+    username = 'isu.wcwave@gmail.com'
+    password = '**********'
+
+    server = smtplib.SMTP_SSL("smtp.gmail.com:465")
+    server.login(username,password)
+    server.sendmail(from_addr, to_addrs, msg.as_string())
+    server.quit()
 
 def main():
     # Initialize datetime, watershed, and database variables
@@ -561,5 +583,11 @@ if __name__ == '__main__':
         'bool_snow_depth': arcpy.GetParameter(8),
         'bool_precip_mass': arcpy.GetParameter(9)
         })
-    main()
+    try:
+        main()
+    finally:
+        emailer()
+
     arcpy.AddMessage('\nAll Data output to {0}\n'.format(grids.data['out_folder']))
+
+
