@@ -70,9 +70,13 @@ def selectWatershed(watershed):
         base_path = r'C:\ReynoldsCreek'
         stations = r'{0}\Relevant_Data.gdb\station_locations'.format(base_path)
         elev_tiff = r'{0}\rc_elevation_filled.tif'.format(base_path)
-        dem = r'{0}\Relevant_Data.gdb\RC_DEM_10m_South'.format(base_path)
+        dem = r'{0}\Relevant_Data.gdb\RC_500MBuff_10MCell'.format(base_path)
         view_factor = r'{0}\Relevant_Data.gdb\RC_ViewFactor_10M_South'.format(base_path)
         db = 'rc_data'
+        
+        # Testing lower resolution and smaller 
+        dem = r'{0}\Relevant_Data.gdb\RC_500MBuff_10MCell'.format(base_path)
+        
     elif watershed == 'TESTING':
         arcpy.AddMessage('Testing watershed')
         file_path = os.path.dirname(os.path.abspath(__file__))
@@ -423,7 +427,7 @@ def CombinedMethod(parameter, data_table, date_stamp, out_ras):
     arcpy.management.Delete(resid_raster)
     return out_raster_name
 
-def Krig(parameter, scratch_table, date_stamp, out_name):
+def Interpolate(parameter, scratch_table, date_stamp, out_name):
     '''Interpolate using the chosen method'''
     if data['kriging_method'] == 'Detrended':
         raster = DetrendedMethod(parameter, scratch_table, date_stamp, out_name)
@@ -471,7 +475,7 @@ def AirTemperature(clim_tab, date_stamp):
     #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
     
     #Kriging
-    raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+    raster = Interpolate(param, scratch_table, date_stamp, out_raster_title)
     
     #Delete tempStations when done.
     #arcpy.management.Delete(scratch_table)
@@ -485,7 +489,7 @@ def DewPoint(clim_tab, date_stamp):
     #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_dp')
     
     #Kriging
-    raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+    raster = Interpolate(param, scratch_table, date_stamp, out_raster_title)
 
     #Delete tempStations when done
     arcpy.management.Delete(scratch_table)
@@ -529,7 +533,7 @@ def VaporPressure(clim_tab, date_stamp):
     #arcpy.management.CopyRows(scratch_table, data['scratch_gdb'] + '/temp_ta')
     
     #Kriging
-    raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+    raster = Interpolate(param, scratch_table, date_stamp, out_raster_title)
 
     #Delete tempStations when done.
     arcpy.management.Delete(scratch_table)
@@ -708,7 +712,7 @@ def PrecipitationMass(precip_tab, date_stamp):
         else: 
             return
     else:
-        raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+        raster = Interpolate(param, scratch_table, date_stamp, out_raster_title)
          
         #Delete tempStations when done
         arcpy.management.Delete(scratch_table)
@@ -741,7 +745,7 @@ def SnowDepth(snow_tab, date_stamp):
     average = numpy.mean(values)
     count = int(arcpy.management.GetCount(scratch_table).getOutput(0))
     if count >= 10 and average > 0:
-        raster = Krig(param, scratch_table, date_stamp, out_raster_title)
+        raster = Interpolate(param, scratch_table, date_stamp, out_raster_title)
     else:
         if count < 10: 
             arcpy.AddMessage('Not enough data for snow depth. Try a different time step.')
