@@ -64,6 +64,7 @@ def selectWatershed(watershed):
         elev_tiff = r'{0}\jd_elevation_filled.tif'.format(base_path)
         dem = elev_tiff
         view_factor = r'{0}\jd_view_factor.tif'.format(base_path)
+        search_radius = '1000'
         db = 'jd_data'
 
     elif watershed == 'Reynolds Creek Old':
@@ -75,6 +76,7 @@ def selectWatershed(watershed):
         dem = r'{0}\rc_elev_filled_clip.tif'.format(base_path)
         elev_tiff = dem
         view_factor = r'{0}\Relevant_Data.gdb\RC_ViewFactor_10M_South'.format(base_path)
+        search_radius = '5000'
         db = 'rc_data'
 
     elif watershed == 'Reynolds Creek':
@@ -84,7 +86,19 @@ def selectWatershed(watershed):
         elev_tiff = r'{0}\rc_elev_filled.tif'.format(base_path)
         dem = r'{0}\rc_elev_filled.tif'.format(base_path)
         view_factor = r'{0}\rc_view_factor.tif'.format(base_path)
+        search_radius = '5000'
         db = 'rc_data'
+
+    elif watershed == 'Valles Caldera':
+        arcpy.AddMessage('Valles Caldera Watershed')
+        base_path = r'C:\ReynoldsCreek\VC_Input'
+        stations = r'{0}\station_locations.shp'.format(base_path)
+        elev_tiff = r'{0}\VC_DEM_clip.tif'.format(base_path)
+        dem = elev_tiff
+        view_factor = ''
+        search_radius = '21500'
+        db = r'{0}\vc_data.db'.format(base_path)
+        data['sql_ph'] = '?'
 
     elif watershed == 'TESTING':
         arcpy.AddMessage('Testing watershed')
@@ -95,8 +109,9 @@ def selectWatershed(watershed):
         dem = '{0}\demo_data.tif'.format(base_path)
         view_factor = '{0}\demo_data_vf.tif'.format(base_path)
         db = '{0}\demo.db'.format(base_path)
+        search_radius = '1000'
         data['sql_ph'] = '?'
-    return stations, elev_tiff, dem, view_factor, db
+    return stations, elev_tiff, dem, view_factor, search_radius, db
 
 def ConnectDB(db, username = 'root', passwd = ''):
     '''connect to MySQL database'''
@@ -135,7 +150,7 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['solar_radiation'].append(row[12])
                 param_dict['wind_speed'].append(row[13])
                 param_dict['wind_direction'].append(row[14])
-            elif data['watershed'] == 'Reynolds Creek':
+            elif data['watershed'] == 'Reynolds Creek' or data['watershed'] == 'Valles Caldera':
                 param_dict['site_key'].append(row[0])
                 param_dict['date_time'].append(row[1])
                 param_dict['air_temperature'].append(row[9])
@@ -151,7 +166,7 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['ppts'].append(row[2])
                 param_dict['pptu'].append(row[3])
                 param_dict['ppta'].append(row[4])
-            elif data['watershed'] == 'Reynolds Creek':
+            elif data['watershed'] == 'Reynolds Creek' or data['watershed'] == 'Valles Caldera':
                 param_dict['site_key'].append(row[0])
                 param_dict['ppts'].append(row[2])
                 param_dict['pptu'].append(row[3])
@@ -193,8 +208,9 @@ def BuildClimateTable(params, num):
         for k in range(0, len(keys)):
             # keys[x] = site_key, air_temperature, etc.
             # params[keys[k][j] = value (ie -2.5)
-            row.setValue(keys[k], params[keys[k]][j])
+            row.setValue(keys[k], params[ keys[k] ][j])
         in_cursor.insertRow(row)
+
     del in_cursor
 ##     del row
     return table
@@ -204,6 +220,11 @@ def DataTable(parameter, data_table, multi_fields = []):
     scratch_data = []
     temp_table1 = parameter + '_table'
     temp_table2 = 'in_memory/' + parameter + '_table2'
+    ##===============================================================
+    ##
+    ## These checks really need some work.
+    ##
+    ##===============================================================
     if len(multi_fields) == 2: #Simplify these checks somehow
         #Thermal radation stats_fields
         #  format - [['air_temperature', 'MEAN'], ['vapor_pressure', 'MEAN']]
@@ -358,6 +379,7 @@ def EBKMethod(parameter, data_table, date_stamp, out_ras):
     arcpy.AddMessage('Empirical Bayesian Kriging')
     scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
     out_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], out_ras, date_stamp, data['file_format'])
+    arcpy.AddMessage(data_table)
     arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
             z_field = 'MEAN_' + parameter,
             out_raster = scratch_raster,
@@ -366,7 +388,7 @@ def EBKMethod(parameter, data_table, date_stamp, out_ras):
             max_local_points = '100',
             overlap_factor = '1',
             number_semivariograms = '100',
-            search_neighborhood = 'NBRTYPE=SmoothCircular RADIUS=10000.9518700025 SMOOTH_FACTOR=0.2',
+            search_neighborhood = 'NBRTYPE=SmoothCircular RADIUS={0} SMOOTH_FACTOR=0.2'.format(data['search_radius']),
             output_type = 'PREDICTION',
             quantile_value = '0.5',
             threshold_type = 'EXCEED',
@@ -719,7 +741,7 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
 
 def PrecipitationMass(precip_tab, date_stamp):
     arcpy.AddMessage('Precipitation mass')
-    param = 'ppts'
+    param = 'ppta'
     out_raster_title = 'm_pp'
     out_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], out_raster_title, date_stamp, data['file_format'])
     scratch_table = DataTable(param, precip_tab)
@@ -730,7 +752,7 @@ def PrecipitationMass(precip_tab, date_stamp):
         y = []
         for row in cursor:
             x.append(row.getValue('RASTERVALU'))
-            y.append(row.getValue('MEAN_ppts'))
+            y.append(row.getValue('MEAN_ppta'))
         del cursor
         del row
 
@@ -1009,9 +1031,10 @@ def ClearBadZeros():
 
 
 def DeleteScratchData(in_list):
-    for path in in_list:
+    pass
+    #for path in in_list:
         #print path
-        arcpy.management.Delete(path)
+    #    arcpy.management.Delete(path)
 
 # Main Function --- Figure out a way to be run as script or as tool
 #======================================================================
@@ -1027,7 +1050,8 @@ def main():
         'elev_tiff' : return_ws[1],
         'dem' : return_ws[2],
         'view_factor' : return_ws[3],
-        'db' : return_ws[4]
+        'search_radius' : return_ws[4],
+        'db' : return_ws[5],
         })
 
     # Connect to database
@@ -1065,6 +1089,7 @@ def main():
     date_counter = 0
     date_file = open('{0}/date_file.txt'.format(data['out_folder']), 'a')
     while date_increment < data['to_date']:
+        arcpy.AddMessage('Current time step: {0}'.format(date_increment))
         if any([data['bool_all_tools'], data['bool_air_temperature'],
             data['bool_dew_point'], data['bool_vapor_pressure'],
             data['bool_wind_speed'], data['bool_solar_radiation'],
