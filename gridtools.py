@@ -55,63 +55,58 @@ def selectWatershed(watershed):
     elev_tiff = '' # Needed for wind speed. Cannot have NoData cells
     dem = '' # Needed for almost all/elev_tiff can also be used for this
     view_factor = '' # Needed for Thermal radiation
+    search_radius = ''
     db = ''
 
     if watershed == 'Johnston Draw':
         arcpy.AddMessage('Johnston Draw Watershed')
-        base_path = r'C:\ReynoldsCreek\JD_input'
-        stations = r'{0}\station_locations_jd.shp'.format(base_path)
+        base_path = r'C:\ReynoldsCreek\Input_Data'
+        stations = r'{0}\Input_Data.gdb\station_locations_jd'.format(base_path)
+        stations_soil = r'{0}\Input_Data.gdb\station_locations_jd'.format(base_path)
         elev_tiff = r'{0}\jd_elevation_filled.tif'.format(base_path)
         dem = elev_tiff
         view_factor = r'{0}\jd_view_factor.tif'.format(base_path)
         search_radius = '1000'
-        db = 'jd_data'
-
-    elif watershed == 'Reynolds Creek Old':
-        arcpy.AddMessage('Reynolds Creek Watershed')
-        base_path = r'C:\ReynoldsCreek'
-        stations = r'{0}\Relevant_Data.gdb\station_locations'.format(base_path)
-        elev_tiff = r'{0}\rc_elevation_filled.tif'.format(base_path)
-        dem = r'{0}\Relevant_Data.gdb\RC_500MBuff_10MCell'.format(base_path)
-        dem = r'{0}\rc_elev_filled_clip.tif'.format(base_path)
-        elev_tiff = dem
-        view_factor = r'{0}\Relevant_Data.gdb\RC_ViewFactor_10M_South'.format(base_path)
-        search_radius = '5000'
-        db = 'rc_data'
+        db = '{0}/jd_data.db'.format(base_path)
+        data['sql_ph'] = '?'
 
     elif watershed == 'Reynolds Creek':
         arcpy.AddMessage('Reynolds Creek Watershed')
-        base_path = r'C:\ReynoldsCreek\RC_Input'
-        stations = r'{0}\station_locations.shp'.format(base_path)
+        base_path = r'C:\ReynoldsCreek\Input_Data'
+        stations = r'{0}\Input_Data.gdb\station_locations_rc'.format(base_path)
+        stations_soil = r'{0}\Input_Data.gdb\station_locations_rc_soil'.format(base_path)
         elev_tiff = r'{0}\rc_elev_filled.tif'.format(base_path)
-        dem = r'{0}\rc_elev_filled.tif'.format(base_path)
+        dem = elev_tiff
         view_factor = r'{0}\rc_view_factor.tif'.format(base_path)
-        search_radius = '5000'
-        db = 'rc_data'
+        search_radius = '10000'
+        db = r'{0}\rc_data.db'.format(base_path)
+        arcpy.AddMessage(len(db.split('.')))
+        data['sql_ph'] = '?'
 
     elif watershed == 'Valles Caldera':
         arcpy.AddMessage('Valles Caldera Watershed')
-        base_path = r'C:\ReynoldsCreek\VC_Input'
-        stations = r'{0}\station_locations.shp'.format(base_path)
-        elev_tiff = r'{0}\VC_DEM_clip.tif'.format(base_path)
+        base_path = r'C:\ReynoldsCreek\Input_Data'
+        stations = r'{0}\Input_Data.gdb\station_locations_vc'.format(base_path)
+        stations_soil = r'{0}\Input_Data.gdb\station_locations_vc'.format(base_path)
+        elev_tiff = r'{0}\vc_elev_filled.tif'.format(base_path)
         dem = elev_tiff
         view_factor = ''
         search_radius = '21500'
         db = r'{0}\vc_data.db'.format(base_path)
         data['sql_ph'] = '?'
 
-    elif watershed == 'TESTING':
-        arcpy.AddMessage('Testing watershed')
-        file_path = os.path.dirname(os.path.abspath(__file__))
-        base_path = r'{0}\demo_data'.format(file_path)
-        stations = '{0}\demo_sites.shp'.format(base_path)
-        elev_tiff = '{0}\demo_data.tif'.format(base_path)
-        dem = '{0}\demo_data.tif'.format(base_path)
-        view_factor = '{0}\demo_data_vf.tif'.format(base_path)
-        db = '{0}\demo.db'.format(base_path)
-        search_radius = '1000'
-        data['sql_ph'] = '?'
-    return stations, elev_tiff, dem, view_factor, search_radius, db
+    ##elif watershed == 'TESTING':
+    ##    arcpy.AddMessage('Testing watershed')
+    ##    file_path = os.path.dirname(os.path.abspath(__file__))
+    ##    base_path = r'{0}\demo_data'.format(file_path)
+    ##    stations = '{0}\demo_sites.shp'.format(base_path)
+    ##    elev_tiff = '{0}\demo_data.tif'.format(base_path)
+    ##    dem = '{0}\demo_data.tif'.format(base_path)
+    ##    view_factor = '{0}\demo_data_vf.tif'.format(base_path)
+    ##    db = '{0}\demo.db'.format(base_path)
+    ##    search_radius = '1000'
+    ##    data['sql_ph'] = '?'
+    return stations, stations_soil, elev_tiff, dem, view_factor, search_radius, db
 
 def ConnectDB(db, username = 'root', passwd = ''):
     '''connect to MySQL database'''
@@ -173,9 +168,13 @@ def ParameterList(param_dict, rows, table_type):
                 param_dict['ppta'].append(row[4])
     elif table_type == 'soil_temperature':
         for row in rows:
-            if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek':
+            if data['watershed'] == 'Johnston Draw':
                 param_dict['site_key'].append(row[0])
                 param_dict['stm005'].append(row[3]) # column 3 is soil temp at 5 cm depth
+            if data['watershed'] == 'Reynolds Creek':
+                param_dict['site_key'].append(row[0])
+                param_dict['stm005'].append(row[4]) # column 3 is soil temp at 5 cm depth
+                arcpy.AddMessage(row[4])
     elif table_type == 'snow_depth':
         for row in rows:
             if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek' or data['watershed'] == 'TESTING':
@@ -220,6 +219,7 @@ def DataTable(parameter, data_table, multi_fields = []):
     scratch_data = []
     temp_table1 = parameter + '_table'
     temp_table2 = 'in_memory/' + parameter + '_table2'
+
     ##===============================================================
     ##
     ## These checks really need some work.
@@ -251,8 +251,19 @@ def DataTable(parameter, data_table, multi_fields = []):
             statistics_fields = stats_fields,
             case_field = 'site_key')
     # Copy stats to tempStations feature class
-    temp_stations = arcpy.management.CopyFeatures(in_features = data['fc_stations_elev'],
-            out_feature_class = data['scratch_gdb'] + '/tempStations')
+    if parameter == 'stm005':
+        ###====================================
+        ###
+        ### Soil temperature feature class already has elevation data for all feature classes
+        ###
+        ###====================================
+        arcpy.env.extent = data['station_locations_soil']
+        temp_stations = arcpy.management.CopyFeatures(in_features = data['station_locations_soil'],
+                out_feature_class = data['scratch_gdb'] + '/tempStations')
+    else:
+        temp_stations = arcpy.management.CopyFeatures(in_features = data['fc_stations_elev'],
+                out_feature_class = data['scratch_gdb'] + '/tempStations')
+
     # Join stats to temp stations feature class
     if len(multi_fields) > 0: #Thermal radiation and wind speed
         tr_fields = []
@@ -271,10 +282,12 @@ def DataTable(parameter, data_table, multi_fields = []):
             fields = 'MEAN_' + parameter)
 
     # Delete rows from feature class that have negative or null elevations
+
     cursor = arcpy.UpdateCursor(temp_stations)
     if parameter == 'stm005':
         arcpy.AddMessage('Soil temperature')
-        arcpy.env.extent = data['ext_features']
+        arcpy.env.extent = data['station_locations_soil']
+
     else:
         for row in cursor:
             if (row.getValue('RASTERVALU') < 0 or
@@ -469,20 +482,27 @@ def CombinedMethod(parameter, data_table, date_stamp, out_ras):
 
 def Interpolate(parameter, scratch_table, date_stamp, out_name):
     '''Interpolate using the chosen method'''
+    raster = ''
     if data['kriging_method'] == 'Detrended':
         raster = DetrendedMethod(parameter, scratch_table, date_stamp, out_name)
         #raster.save(data['out_folder'] + '/' + param + '.tif')
     elif data['kriging_method'] == 'Combined':
         raster = CombinedMethod(parameter, scratch_table, date_stamp, out_name)
     else:
-        raster = EBKMethod(parameter, scratch_table, date_stamp, out_name)
+        try:
+            raster = EBKMethod(parameter, scratch_table, date_stamp, out_name)
+        except arcpy.ExecuteError:
+            arcpy.AddMessage(arcpy.GetMessages(2))
     return raster
 
 def OLS(parameter, scratch_table, date_stamp, out_name):
     out_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], out_name, date_stamp, data['file_format'])
     #Run ordinary least squares on scratch_table
     coef_table = arcpy.management.CreateTable(data['scratch_gdb'], 'coef_table')
-
+    if parameter == 'stm005':
+        exp_var = 'Elevation'
+    else:
+        exp_var = 'RASTERVALU'
     arcpy.management.AddField(in_table = scratch_table,
             field_name = 'Unique_ID',
             field_type = 'SHORT',
@@ -497,7 +517,7 @@ def OLS(parameter, scratch_table, date_stamp, out_name):
             Unique_ID_Field = 'Unique_ID',
             Output_Feature_Class = 'in_memory/fcResid',
             Dependent_Variable = 'MEAN_' + parameter,
-            Explanatory_Variables = 'RASTERVALU',
+            Explanatory_Variables = exp_var,
             Coefficient_Output_Table = coef_table)
     intercept = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[0]
     slope = list((row.getValue('Coef') for row in arcpy.SearchCursor(coef_table, fields='Coef')))[1]
@@ -784,7 +804,6 @@ def SoilTemperature(soil_tab, date_stamp):
     #Create Scratch Table --
     # this is different from the rest in that it does not delete no elevation
     scratch_table = DataTable(param, soil_tab)
-
     raster = OLS(param, scratch_table, date_stamp, out_raster_title)
     arcpy.management.Delete(scratch_table)
     return raster
@@ -919,8 +938,8 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
 
     fields = ['wind_speed', 'wind_direction', 'air_temperature']
     scratch_table = DataTable(param, clim_tab, multi_fields=fields)
-
-    ninja_path = 'C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe'
+    ninja_path = 'Upload text'
+    ##ninja_path = 'C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe'
     wind_date = in_date_time.split(" ")[0]
     wind_time = in_date_time.split(" ")[1]
     ls_wind_date = wind_date.split("-")
@@ -980,8 +999,8 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
 
     #run the WindNinja_cli.exe (output is written to the same location as elevatoin raster)
     arcpy.AddMessage('Calling WindNinja command line interface')
-    runfile = subprocess.Popen(args, stdout = subprocess.PIPE, bufsize = -1)
-    runfile.wait()
+    ##runfile = subprocess.Popen(args, stdout = subprocess.PIPE, bufsize = -1)
+    ##runfile.wait()
     output = runfile.stdout.read()
     if output is None:
         arcpy.AddMessage('Results: None returned\n')
@@ -1029,6 +1048,24 @@ def ClearBadZeros():
         else:
             out_con.save('{0}\\{1}.tif'.format(data['scratch_ws'], nm[0]))
 
+def emailer():
+    from_addr = 'isu.wcwave@gmail.com'
+    to_addrs = 'tucker.r.chapman@gmail.com'
+
+    msg = MIMEMultipart()
+    msg['From'] = from_addr
+    msg['To'] = to_addrs
+    msg['Subject'] = 'Job Complete'
+    message = 'One of the programs is complete' + '\n\n' + arcpy.GetMessages()
+    msg.attach(MIMEText(message))
+
+    username = 'isu.wcwave@gmail.com'
+    password = '' ## MAKE SURE NOT TO COMMIT THE PASSWORD TO GIT
+
+    server = smtplib.SMTP_SSL("smtp.gmail.com:465")
+    server.login(username,password)
+    server.sendmail(from_addr, to_addrs, msg.as_string())
+    server.quit()
 
 def DeleteScratchData(in_list):
     pass
@@ -1047,11 +1084,12 @@ def main():
 
     return_ws = selectWatershed(data['watershed'])
     data.update({'stations' : return_ws[0],
-        'elev_tiff' : return_ws[1],
-        'dem' : return_ws[2],
-        'view_factor' : return_ws[3],
-        'search_radius' : return_ws[4],
-        'db' : return_ws[5],
+        'stations_soil' : return_ws[1],
+        'elev_tiff' : return_ws[2],
+        'dem' : return_ws[3],
+        'view_factor' : return_ws[4],
+        'search_radius' : return_ws[5],
+        'db' : return_ws[6],
         })
 
     # Connect to database
@@ -1065,8 +1103,13 @@ def main():
     data.update({'fc_stations_elev': data['scratch_gdb'] + '/stations_wElev'})
     ls_scratch_data.append(data['fc_stations_elev'])
     data.update({'station_locations' : data['scratch_gdb'] + '/station_locations'})
+    data.update({'station_locations_soil' : data['scratch_gdb'] + '/station_locations_soil'})
+
     arcpy.management.CopyFeatures(data['stations'], data['station_locations'])
+    arcpy.management.CopyFeatures(data['stations_soil'], data['station_locations_soil'])
+
     ls_scratch_data.append(data['station_locations'])
+    ls_scratch_data.append(data['station_locations_soil'])
     data['ext_features'] = arcpy.Describe(data['station_locations']).extent
 
     arcpy.env.cellSize = data['dem']
