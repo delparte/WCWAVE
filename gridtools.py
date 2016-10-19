@@ -390,11 +390,28 @@ def DetrendedMethod(parameter, data_table, date_stamp, out_ras):
     arcpy.management.Delete(resid_raster)
     return out_raster_name
 
+def IDWMethod(parameter, data_table, date_stamp, out_ras):
+    arcpy.AddMessage('Inverse Distance Weighted')
+    scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
+    out_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], out_ras, date_stamp, data['file_format'])
+    idw_out = arcpy.sa.Idw(in_point_features = data_table,
+            z_field = 'MEAN_' + parameter,
+            cell_size = data['elev_tiff'],
+            power = 2)
+    if(data['file_format'] == 'ASC'):
+        arcpy.conversion.RasterToASCII(idw_out, out_raster_name)
+    else:
+        idw_out.save(out_raster_name)
+        arcpy.AddMessage('Out Raster {0}'.format(out_raster_name))
+    
+    return out_raster_name
+            
+    
 def EBKMethod(parameter, data_table, date_stamp, out_ras):
     arcpy.AddMessage('Empirical Bayesian Kriging')
     scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
     out_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], out_ras, date_stamp, data['file_format'])
-    arcpy.AddMessage(data_table)
+    ##arcpy.AddMessage(data_table)
     arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
             z_field = 'MEAN_' + parameter,
             out_raster = scratch_raster,
@@ -490,6 +507,8 @@ def Interpolate(parameter, scratch_table, date_stamp, out_name):
         #raster.save(data['out_folder'] + '/' + param + '.tif')
     elif data['kriging_method'] == 'Combined':
         raster = CombinedMethod(parameter, scratch_table, date_stamp, out_name)
+    elif data['kriging_method'] == 'IDW':
+        raster = IDWMethod(parameter, scratch_table, date_stamp, out_name)
     else:
         try:
             raster = EBKMethod(parameter, scratch_table, date_stamp, out_name)
