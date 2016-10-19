@@ -65,6 +65,8 @@ def GraphRegression(time_stamp='test', param_type = 'test',
         point_color = 'blue'
     elif param_type == 'z_s':
         point_color = 'yellow'
+    elif param_type == 'u':
+        point_color = 'orange'
     #
     x_y_line = [min(x), max(x)]
     y_values = x_y_line
@@ -130,13 +132,15 @@ def main():
 
     return_ws = grids.selectWatershed(grids.data['watershed']) # Necessary rasters and vector data
     grids.data.update({'stations' : return_ws[0],
-        'elev_tiff' : return_ws[1],
-        'dem' : return_ws[2],
-        'view_factor' : return_ws[3],
-        'search_radius' : return_ws[4],
-        'db' : return_ws[5]
+        'stations_soil' : return_ws[1],
+        'elev_tiff' : return_ws[2],
+        'dem' : return_ws[3],
+        'view_factor' : return_ws[4],
+        'search_radius' : return_ws[5],
+        'db' : return_ws[6],
         })
 
+    arcpy.AddMessage(grids.data['db'])
     db_cnx = grids.ConnectDB(grids.data['db']) # Database connection
     ls_scratch_data = []
     ls_output = []
@@ -186,7 +190,8 @@ def main():
         # =======================================
         if any([grids.data['bool_air_temperature'],
             grids.data['bool_dew_point'],
-            grids.data['bool_vapor_pressure']]):
+            grids.data['bool_vapor_pressure'],
+            grids.data['bool_wind_speed']]):
 
             parameters = {'site_key' : [],
                     'date_time' : [],
@@ -221,9 +226,9 @@ def main():
                 if st in station_welevation and st not in sites_list:
                     sites_list.append(st)
             ## arcpy.AddMessage('sites_lists : {0}'.format(sites_list))
-            observed = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
-            modeled = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
-            create_time = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': []}
+            observed = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': [],'wind_speed': []}
+            modeled = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': [], 'wind_speed': []}
+            create_time = {'air_temperature': [], 'dew_point': [], 'vapor_pressure': [], 'wind_speed': []}
 
             # Iterate through sites_list leaving one site out per iteration.
             # ===============================================================
@@ -294,6 +299,18 @@ def main():
                     end_dew = time.time()
                     create_time['vapor_pressure'].append(end_dew - start)
                     ls_scratch_data_imd.append(path_vapor_pressure)
+                if grids.data['bool_wind_speed']:
+                    start = time.time()
+                    path_wind_speed = grids.WindSpeed(climate_table, time_stamp, from_date)
+                    point_error = LeaveOneOutValue(raster= path_wind_speed,
+                            site_toget=site,
+                            station_locations = grids.data['station_locations'])
+                    obs_point = ObservedValue(obs_parameters, 'wind_speed', site)
+                    modeled['wind_speed'].append(point_error)
+                    observed['wind_speed'].append(obs_point)
+                    end_dew = time.time()
+                    create_time['wind_speed'].append(end_dew - start)
+                    ls_scratch_data_imd.append(path_wind_speed)
                 arcpy.AddMessage(' ') # Newline space for clarity
                 # END INTERPOLATION
                 # ========================================================
@@ -336,6 +353,18 @@ def main():
                         modeled['vapor_pressure'],
                         observed['vapor_pressure'],
                         create_time['vapor_pressure'])
+            if grids.data['bool_wind_speed']:
+                GraphRegression(time_stamp = time_stamp,
+                        label = sites_list,
+                        param_type = 'u',
+                        x = modeled['wind_speed'],
+                        y = observed['wind_speed'])
+                PrintDataToCSV('wind_speed',
+                        date_increment,
+                        sites_list,
+                        modeled['wind_speed'],
+                        observed['wind_speed'],
+                        create_time['wind_speed'])
             # END GRAPHING
             # ======================================================
         # Precipitation Mass
@@ -583,6 +612,7 @@ if __name__ == '__main__':
         'bool_vapor_pressure': arcpy.GetParameter(7),
         'bool_snow_depth': arcpy.GetParameter(8),
         'bool_precip_mass': arcpy.GetParameter(9),
+        'bool_wind_speed': arcpy.GetParameter(10),
         'file_format' : "ASC"
         })
     try:
