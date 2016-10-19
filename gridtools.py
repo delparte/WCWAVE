@@ -18,6 +18,10 @@ import json
 import shutil
 import subprocess
 
+import smtplib
+from email.MIMEMultipart import MIMEMultipart
+from email.MIMEText import MIMEText
+
 ##Checkout needed Extentions
 arcpy.CheckOutExtension('Spatial')
 arcpy.CheckOutExtension('GeoStats')
@@ -41,7 +45,7 @@ s_now = date_now.strftime('%Y%d%b_%H%M%S')
 os.makedirs(scratchWS + '/Output_' + s_now)
 outFolder = '{0}/Output_{1}'.format(scratchWS, s_now)
 data['out_folder'] = outFolder
-arcpy.AddMessage('Output Folder: ' + outFolder)
+##arcpy.AddMessage('Output Folder: ' + outFolder)
 
 ##Define Functions
 def roundTime(dt, roundTo=60):
@@ -80,7 +84,6 @@ def selectWatershed(watershed):
         view_factor = r'{0}\rc_view_factor.tif'.format(base_path)
         search_radius = '10000'
         db = r'{0}\rc_data.db'.format(base_path)
-        arcpy.AddMessage(len(db.split('.')))
         data['sql_ph'] = '?'
 
     elif watershed == 'Valles Caldera':
@@ -128,7 +131,7 @@ def ConnectDB(db, username = 'root', passwd = ''):
         else:
             arcpy.AddMessage('Connection successful')
     ## Connect to sqlite3 database
-    elif len(db.split('.')) == 2:
+    elif db.split('.')[-1] == 'db':
         cnx = sqlite3.connect(db)
         return cnx
 
@@ -174,7 +177,6 @@ def ParameterList(param_dict, rows, table_type):
             if data['watershed'] == 'Reynolds Creek':
                 param_dict['site_key'].append(row[0])
                 param_dict['stm005'].append(row[4]) # column 3 is soil temp at 5 cm depth
-                arcpy.AddMessage(row[4])
     elif table_type == 'snow_depth':
         for row in rows:
             if data['watershed'] == 'Johnston Draw' or data['watershed'] == 'Reynolds Creek' or data['watershed'] == 'TESTING':
@@ -199,8 +201,8 @@ def BuildClimateTable(params, num):
             field_type = ftype)
         keys.append(key)
     in_cursor = arcpy.InsertCursor(table)
-    print keys
-    print params
+    #print keys
+    #print params
     #Add data from rows into climate table
     for j in range(0, num):
         row = in_cursor.newRow()
@@ -939,7 +941,7 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
     fields = ['wind_speed', 'wind_direction', 'air_temperature']
     scratch_table = DataTable(param, clim_tab, multi_fields=fields)
     ninja_path = 'Upload text'
-    ##ninja_path = 'C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe'
+    ninja_path = 'C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe'
     wind_date = in_date_time.split(" ")[0]
     wind_time = in_date_time.split(" ")[1]
     ls_wind_date = wind_date.split("-")
@@ -999,8 +1001,8 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
 
     #run the WindNinja_cli.exe (output is written to the same location as elevatoin raster)
     arcpy.AddMessage('Calling WindNinja command line interface')
-    ##runfile = subprocess.Popen(args, stdout = subprocess.PIPE, bufsize = -1)
-    ##runfile.wait()
+    runfile = subprocess.Popen(args, stdout = subprocess.PIPE, bufsize = -1)
+    runfile.wait()
     output = runfile.stdout.read()
     if output is None:
         arcpy.AddMessage('Results: None returned\n')
@@ -1048,15 +1050,14 @@ def ClearBadZeros():
         else:
             out_con.save('{0}\\{1}.tif'.format(data['scratch_ws'], nm[0]))
 
-def emailer():
+def emailer(email, subject, message):
     from_addr = 'isu.wcwave@gmail.com'
-    to_addrs = 'tucker.r.chapman@gmail.com'
-
+    to_addrs = '{0}'.format(email)
     msg = MIMEMultipart()
     msg['From'] = from_addr
     msg['To'] = to_addrs
-    msg['Subject'] = 'Job Complete'
-    message = 'One of the programs is complete' + '\n\n' + arcpy.GetMessages()
+    msg['Subject'] = subject
+    message = message
     msg.attach(MIMEText(message))
 
     username = 'isu.wcwave@gmail.com'
@@ -1081,7 +1082,6 @@ def main():
     data['from_date'] = roundTime(from_date_round, 60*60)
 
     data['to_date'] = roundTime(to_date_round)
-
     return_ws = selectWatershed(data['watershed'])
     data.update({'stations' : return_ws[0],
         'stations_soil' : return_ws[1],
@@ -1128,10 +1128,11 @@ def main():
     delta = datetime.timedelta(hours=data['time_step'])
     date_increment = data['from_date']
 
-    # date_counter - counter to help setup data for ISNOBAL
+    # date_counter - counter to help setup data for ISNOBAL (saved in date_file.txt)
     date_counter = 0
     date_file = open('{0}/date_file.txt'.format(data['out_folder']), 'a')
     while date_increment < data['to_date']:
+        arcpy.AddMessage(' ')
         arcpy.AddMessage('Current time step: {0}'.format(date_increment))
         if any([data['bool_all_tools'], data['bool_air_temperature'],
             data['bool_dew_point'], data['bool_vapor_pressure'],
@@ -1163,7 +1164,7 @@ def main():
             cur.execute(query, (from_date,to_date))
             rows = cur.fetchall()
             i_num_return = len(rows)
-            arcpy.AddMessage('Query: ' + query)
+            ##arcpy.AddMessage('Query: ' + query)
             #arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
             #Build parameter lists into dictionary
             parameters = ParameterList(parameters, rows, table_type = 'climate')
@@ -1235,8 +1236,8 @@ def main():
             cur.execute(query, (from_date, to_date))
             rows = cur.fetchall()
             i_num_return = len(rows)
-            arcpy.AddMessage('Query: ' + query)
-            arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
+            ##arcpy.AddMessage('Query: ' + query)
+            ##arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
             parameters = ParameterList(parameters, rows, table_type = 'precip')
             cur.close()
 
@@ -1267,8 +1268,8 @@ def main():
             cur.execute(query, (from_date, to_date))
             rows = cur.fetchall()
             i_num_return = len(rows)
-            arcpy.AddMessage('Query: ' + query)
-            arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
+            ##arcpy.AddMessage('Query: ' + query)
+            ##arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
             parameters = ParameterList(parameters, rows, table_type = 'soil_temperature')
             cur.close()
 
@@ -1304,8 +1305,8 @@ def main():
         cur.execute(query, (from_date, to_date))
         rows = cur.fetchall()
         i_num_return = len(rows)
-        arcpy.AddMessage('Query: ' + query)
-        arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
+        ##arcpy.AddMessage('Query: ' + query)
+        ##arcpy.AddMessage('Row Count: {0}'.format(i_num_return))
         #Build parameter lists into dictionary
         parameters = ParameterList(parameters, rows, table_type = 'snow_depth')
         cur.close()
@@ -1363,7 +1364,8 @@ if __name__ == '__main__':
         'bool_solar_radiation' : arcpy.GetParameter(19),
         'bool_thermal_radiation' : arcpy.GetParameter(20),
         'bool_vapor_pressure' : arcpy.GetParameter(21),
-        'bool_wind_speed' : arcpy.GetParameter(22)
+        'bool_wind_speed' : arcpy.GetParameter(22),
+        'email_address' : arcpy.GetParameterAsText(24),
 
     })
 
@@ -1392,6 +1394,18 @@ if __name__ == '__main__':
 ##         'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
 ##         })
     main()
+##    try:
+##        main()
+##    except:
+##        arcpy.AddMessage("Error")
+##        subject = "[VWCSIT] There was an error"
+##        message = arcpy.GetMessages(0)
+##        emailer(data['email_address'], subject, message)
+##    else:
+##        subject = "[VWCSIT] Processing Complete"
+##        message = "Download the output at <>\n\n"
+##        message += arcpy.GetMessages(0)
+##        emailer(data['email_address'], subject, message)
 ##     import cProfile
 ##     import pstats
 ##     pr = cProfile.Profile()
