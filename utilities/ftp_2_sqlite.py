@@ -1,11 +1,22 @@
+import arcpy
 import sqlite3 as sql
 import os
 
+
+path_data_folder_climate = arcpy.GetParameterAsText(0)
+path_data_folder_snow_depth = arcpy.GetParameterAsText(1)
+path_data_folder_precipitation = arcpy.GetParameterAsText(2)
+path_data_folder_soil_temp = arcpy.GetParameterAsText(3)
+path_output = arcpy.GetParameterAsText(4)
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
+dir_path = path_output
 bad_station = []
+duplicates = False
+ls_duplicates = []
 
 conn = sql.connect("{0}/rc_data.db".format(dir_path))
-conn.execute('''CREATE TABLE IF NOT EXISTS 'weather' ('Site_Key' TEXT NOT NULL,
+conn.execute('''CREATE TABLE IF NOT EXISTS 'climate' ('Site_Key' TEXT NOT NULL,
 'date_time' TEXT NOT NULL,
 'wy' INTEGER NOT NULL DEFAULT '1900',
 'wd' INTEGER NOT NULL DEFAULT '1',
@@ -61,17 +72,13 @@ conn.execute('''CREATE TABLE IF NOT EXISTS 'precipitation' ('Site_Key' TEXT NOT 
 PRIMARY KEY('site_key','date_time'))''')
 
 def main():
-    path_data_folder_climate = "C:/ReynoldsCreek/Watersheds/RC/ftp_data/climate/hourly-model-reference"
-    print("weather")
-    insertData("weather", path_data_folder_climate)
-    path_data_folder_snow_depth = "C:/ReynoldsCreek/Watersheds/RC/ftp_data/snow-depth"
-    print("snow depth")
+    arcpy.AddMessage("Processing Climate")
+    insertData("climate", path_data_folder_climate)
+    arcpy.AddMessage("Processing Snow Depth")
     insertData("snow_depth", path_data_folder_snow_depth)
-    path_data_folder_precipitation = "C:/ReynoldsCreek/Watersheds/RC/ftp_data/precip/hourly"
-    print("Precipitation")
+    arcpy.AddMessage("Processing Precipitation")
     insertData("precipitation", path_data_folder_precipitation)
-    path_data_folder_soil_temp = "C:/ReynoldsCreek/Watersheds/RC/ftp_data/soil_temp/hourly"
-    print("soil temperature")
+    arcpy.AddMessage("Processing Soil Temperature")
     insertData("soil_temperature", path_data_folder_soil_temp)
 
 def insertData(table, path_dir):
@@ -90,6 +97,7 @@ def insertData(table, path_dir):
                         if "Site:" in line or "Site" and "Key" in line:
                             ##print(line)
                             site_key = line[-1]
+                            arcpy.AddMessage("\t Station {0}".format(site_key))
                     else:
                         line = line.split(',')
                     if line[0]== 'datetime':
@@ -111,6 +119,9 @@ def insertData(table, path_dir):
                         except sql.IntegrityError:
                             print(ls_data)
                             print("Not added. Likely a duplicate")
+                            ls_data.insert(0, table)
+                            ls_duplicates.append(ls_data)
+                            duplicates = True
                         except sql.OperationalError as e:
                             if ls_data[0] not in bad_station:
                                 print("Error: {0}, {1},\n {2}".format(ls_data[0],table, e))
@@ -120,5 +131,11 @@ def insertData(table, path_dir):
 if __name__ == "__main__":
     main()
     conn.close()
+    if(duplicates):
+        arcpy.AddMessage("Duplicate data skipped during processing. (Log saved to {0})".format("{0}/duplicates.txt".format(dir_path)))
+        with open("{0}/duplicates.txt".format(dir_path), 'wb') as txt:
+            for item in ls_duplicates:
+                txt.write("%s/n" % item)
+            txt.close()
 
 
