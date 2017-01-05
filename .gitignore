@@ -3,3 +3,5 @@
 *.swo
 *.prj
 *.pyc
+password.txt
+testing/*

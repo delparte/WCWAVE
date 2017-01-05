@@ -647,7 +647,7 @@ def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
 
     try:
         out_global_radiation = AreaSolarRadiation(data['dem'], '', sky_size, in_twd)
-        out_global_radiation = out_global_radiation / data['time_step']
+        #out_global_radiation = out_global_radiation / data['time_step']
     except arcpy.ExecuteError:
         msgs = arcpy.GetMessages(2)
         #arcpy.AddMessage(msgs)
@@ -960,7 +960,7 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
     fields = ['wind_speed', 'wind_direction', 'air_temperature']
     scratch_table = DataTable(param, clim_tab, multi_fields=fields)
     ninja_path = 'Upload text'
-    ninja_path = 'C:/WindNinja/WindNinja-2.5.1/bin/WindNinja_cli.exe'
+    ninja_path = 'C:/WindNinja/WindNinja-3.1.1/bin/WindNinja_cli.exe'
     wind_date = in_date_time.split(" ")[0]
     wind_time = in_date_time.split(" ")[1]
     ls_wind_date = wind_date.split("-")
@@ -1080,7 +1080,11 @@ def emailer(email, subject, message):
     msg.attach(MIMEText(message))
 
     username = 'isu.wcwave@gmail.com'
-    password = '' ## MAKE SURE NOT TO COMMIT THE PASSWORD TO GIT
+    password = ''
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    text_file = dir_path + "/password.txt"
+    with open(text_file, 'r') as myfile:
+        password = myfile.read() ## MAKE SURE NOT TO COMMIT THE PASSWORD TO GIT
 
     server = smtplib.SMTP_SSL("smtp.gmail.com:465")
     server.login(username,password)
@@ -1413,18 +1417,18 @@ if __name__ == '__main__':
 ##         'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
 ##         })
     main()
-##    try:
-##        main()
-##    except:
-##        arcpy.AddMessage("Error")
-##        subject = "[VWCSIT] There was an error"
-##        message = arcpy.GetMessages(0)
-##        emailer(data['email_address'], subject, message)
-##    else:
-##        subject = "[VWCSIT] Processing Complete"
-##        message = "Download the output at <>\n\n"
-##        message += arcpy.GetMessages(0)
-##        emailer(data['email_address'], subject, message)
+    try:
+        main()
+    except:
+        arcpy.AddMessage("Error")
+        subject = "[VWCSIT] There was an error"
+        message = arcpy.GetMessages(0)
+        emailer(data['email_address'], subject, message)
+    else:
+        subject = "[VWCSIT] Processing Complete"
+        message = "Download the output at <>\n\n"
+        message += arcpy.GetMessages(0)
+        emailer(data['email_address'], subject, message)
 ##     import cProfile
 ##     import pstats
 ##     pr = cProfile.Profile()
