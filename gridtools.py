@@ -411,7 +411,7 @@ def EBKMethod(parameter, data_table, date_stamp, out_ras):
     arcpy.AddMessage('Empirical Bayesian Kriging')
     scratch_raster = '{0}/{1}'.format(data['scratch_gdb'], parameter)
     out_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], out_ras, date_stamp, data['file_format'])
-    ##arcpy.AddMessage(data_table)
+    #arcpy.AddMessage(data_table)
     arcpy.ga.EmpiricalBayesianKriging(in_features = data_table,
             z_field = 'MEAN_' + parameter,
             out_raster = scratch_raster,
@@ -1071,31 +1071,32 @@ def ClearBadZeros():
 
 def emailer(email, subject, message):
     from_addr = 'isu.wcwave@gmail.com'
-    to_addrs = '{0}'.format(email)
+    to_addrs = email
     msg = MIMEMultipart()
     msg['From'] = from_addr
     msg['To'] = to_addrs
     msg['Subject'] = subject
     message = message
     msg.attach(MIMEText(message))
+    if len(to_addrs) > 2:
+        username = 'isu.wcwave@gmail.com'
+        password = ''
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        text_file = dir_path + "/password.txt"
+        with open(text_file, 'r') as myfile:
+            password = myfile.read() ## MAKE SURE NOT TO COMMIT THE PASSWORD TO GIT
 
-    username = 'isu.wcwave@gmail.com'
-    password = ''
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    text_file = dir_path + "/password.txt"
-    with open(text_file, 'r') as myfile:
-        password = myfile.read() ## MAKE SURE NOT TO COMMIT THE PASSWORD TO GIT
-
-    server = smtplib.SMTP_SSL("smtp.gmail.com:465")
-    server.login(username,password)
-    server.sendmail(from_addr, to_addrs, msg.as_string())
-    server.quit()
+        server = smtplib.SMTP_SSL("smtp.gmail.com:465")
+        server.login(username,password)
+        server.sendmail(from_addr, to_addrs, msg.as_string())
+        server.quit()
 
 def DeleteScratchData(in_list):
-    pass
-    #for path in in_list:
-        #print path
-    #    arcpy.management.Delete(path)
+    #pass
+    #arcpy.AddMessage("Deleting scratch data")
+    for path in in_list:
+        print path
+        arcpy.management.Delete(path)
 
 # Main Function --- Figure out a way to be run as script or as tool
 #======================================================================
@@ -1354,6 +1355,7 @@ def main():
     db_cnx.close()
     date_file.close()
 
+    ls_scratch_data.append(scratchGDB)
     DeleteScratchData(ls_scratch_data)
     arcpy.management.Delete('in_memory')
 
@@ -1392,30 +1394,6 @@ if __name__ == '__main__':
 
     })
 
-##     data.update({'ll_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []},
-##         'density_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'OBJECTID': u'OBJECTID', u'Density': u'Density'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Density', u'type': u'esriFieldTypeSingle', u'name': u'Density'}], u'displayFieldName': u'', u'features': []},
-##         'bool_air_temperature': True,
-##         'bool_vapor_pressure': True,
-##         'to_date': u'2014-01-01 13:00:00',
-##         'time_step': 1,
-##         'bool_soil_temperature': False,
-##         'rl_constant': 0.005,
-##         'from_date': u'2014-01-01 12:00:00',
-##         'bool_solar_radiation': False,
-##         'bool_all_tools': False,
-##         'h2o_constant': 0.2,
-##         'db': 'jd_data',
-##         'bool_dew_point': False,
-##         'bool_precip_mass': False,
-##         'bool_wind_speed': False,
-##         'kriging_method': u'Empirical Bayesian',
-##         'bool_thermal_radiation': True,
-##         'bool_constants': False,
-##         'bool_snow_properties': False,
-##         'watershed': u'TESTING',
-##         'bool_snow_depth': False,
-##         'ul_interp_values': {u'fieldAliases': {u'Elevation': u'Elevation', u'Temperature': u'Temperature', u'OBJECTID': u'OBJECTID'}, u'fields': [{u'alias': u'OBJECTID', u'type': u'esriFieldTypeOID', u'name': u'OBJECTID'}, {u'alias': u'Elevation', u'type': u'esriFieldTypeSingle', u'name': u'Elevation'}, {u'alias': u'Temperature', u'type': u'esriFieldTypeSingle', u'name': u'Temperature'}], u'displayFieldName': u'', u'features': []}
-##         })
     main()
     try:
         main()
