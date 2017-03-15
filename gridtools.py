@@ -711,9 +711,9 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
 
     fields = ['air_temperature', 'vapor_pressure']
     scratch_table = DataTable(param, clim_tab, multi_fields=fields)
-    P_m = 0.0
-    T_m = 0.0
-    z_m = 0.0
+    P_m = 0.0 # Reference Air Pressure (Vapor pressure)
+    T_m = 0.0 # Reference Air Temp
+    z_m = 0.0 # Reference elevation
     T_s = in_surface_temp
     cursor = arcpy.UpdateCursor(scratch_table)
     for row in cursor:
@@ -731,12 +731,12 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
     arcpy.AddMessage("T_s: " + str(T_s))
 
     # Constants
-    g = 9.8
-    m = 0.0289
-    R = 8.3143
-    sigma = 5.6697 * 10 ** -8
-    epsilon_s = 0.95
-    gamma = -0.006
+    g = 9.8 # Gravity
+    m = 0.0289 # Molecular Weight of dry air
+    R = 8.3143 # Gas constant
+    sigma = 5.6697 * 10 ** -8 # Stefan-Boltzmann constant
+    epsilon_s = 0.95 # Surface emissivity
+    gamma = -0.006 # temperature lapse rate (K m^-1)
 
     # convert temperature parameters to Kelvin
     T_m = T_m + 274.15
@@ -1050,8 +1050,8 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
 
     DeleteScratchData(scratch_data)
 
-    return out_file
 
+    return out_file
 def ClearBadZeros():
     fix_zero = []
     for f in glob.glob('m_pp_*.{0}'.format(data['file_format'])):
@@ -1394,7 +1394,7 @@ if __name__ == '__main__':
 
     })
 
-    main()
+    #main()
     try:
         main()
     except:
@@ -1406,7 +1406,7 @@ if __name__ == '__main__':
         subject = "[VWCSIT] Processing Complete"
         message = "Download the output at <>\n\n"
         message += arcpy.GetMessages(0)
-        emailer(data['email_address'], subject, message)
+        emailer(data['email_address'], subject, message) 
 ##     import cProfile
 ##     import pstats
 ##     pr = cProfile.Profile()
