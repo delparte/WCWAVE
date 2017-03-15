@@ -613,11 +613,20 @@ if __name__ == '__main__':
         'bool_snow_depth': arcpy.GetParameter(8),
         'bool_precip_mass': arcpy.GetParameter(9),
         'bool_wind_speed': arcpy.GetParameter(10),
+        'email_address': arcpy.GetParameterAsText(11),
         'file_format' : "ASC"
         })
+
     try:
         main()
-    finally:
-        emailer()
-
+    except:
+        arcpy.AddMessage("Error")
+        subject = "[VWCSIT] There was an error"
+        message = arcpy.GetMessages(0)
+        grids.emailer(grids.data['email_address'], subject, message)
+    else:
+        subject = "[VWCSIT] Processing Complete"
+        message = "Download the output at <>\n\n"
+        message += arcpy.GetMessages(0)
+        grids.emailer(grids.data['email_address'], subject, message) 
     arcpy.AddMessage('\nAll Data output to {0}\n'.format(grids.data['out_folder']))
