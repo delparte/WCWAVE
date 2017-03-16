@@ -426,7 +426,11 @@ def EBKMethod(parameter, data_table, date_stamp, out_ras):
             threshold_type = 'EXCEED',
             semivariogram_model_type='WHITTLE_DETRENDED')
     #Mask output to size of original DEM
-    outExtract = ExtractByMask(scratch_raster, data['dem'])
+
+    ## For some reason this is no longer a problem.
+    ## Extract By Mask does not run well on newer versions of arcmap so it is not used.
+    #outExtract = ExtractByMask(scratch_raster, data['dem'])
+    outExtract = arcpy.Raster(scratch_raster)
     if(data['file_format'] =='ASC'):
         arcpy.conversion.RasterToASCII(outExtract, out_raster_name)
     else:
@@ -1394,7 +1398,7 @@ if __name__ == '__main__':
 
     })
 
-    #main()
+    # main()
     try:
         main()
     except:
