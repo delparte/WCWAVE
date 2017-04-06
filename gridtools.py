@@ -964,7 +964,7 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
     fields = ['wind_speed', 'wind_direction', 'air_temperature']
     scratch_table = DataTable(param, clim_tab, multi_fields=fields)
     ninja_path = 'Upload text'
-    ninja_path = 'C:/WindNinja/WindNinja-3.1.1/bin/WindNinja_cli.exe'
+    #ninja_path = 'C:/WindNinja/WindNinja-3.1.1/bin/WindNinja_cli.exe' # comment to upload
     wind_date = in_date_time.split(" ")[0]
     wind_time = in_date_time.split(" ")[1]
     ls_wind_date = wind_date.split("-")
@@ -996,32 +996,36 @@ def WindSpeed(clim_tab, date_stamp, in_date_time):
     csvFile.close()
     #List arguments for WindNinja CLI
     args = []
-    args = [ninja_path,
-    "--initialization_method", "pointInitialization",
-    "--elevation_file", data['elev_tiff'], #elevation raster (cannot contain any "no-data" values)
-    "--match_points", "false", #match simulations to points (simulation fails if set to true)
-    "--year", wind_year,
-    "--month", wind_month,
-    "--day", wind_day,
-    "--hour", wind_hour,
-    "--minute", wind_minute,
-    "--mesh_resolution", data['output_cell_size'], #Resolution of model calculations
-    "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
-    "--time_zone", "America/Boise", #time zone of target simulation
-    "--diurnal_winds", "true", #consider diurnal cycles in calculations
-    "--write_goog_output", "false", #write kml output (boolean: true/false)
-    "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
-    "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
-    "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
-    "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
-    "--units_ascii_out_resolution", "m",
-    "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
-    "--units_output_wind_height", "m", #units of output wind height
-    "--output_speed_units", "mps",
-    "--output_wind_height", "3",
-    "--wx_station_filename", csv_filename, #weather station csv file used in point initialization method
-    "--output_path", data['scratch_ws']] #path to output
 
+    # Comment forme here to end of Args for upload
+    # args = [ninja_path,
+    # "--initialization_method", "pointInitialization",
+    # "--elevation_file", data['elev_tiff'], #elevation raster (cannot contain any "no-data" values)
+    # "--match_points", "false", #match simulations to points (simulation fails if set to true)
+    # "--year", wind_year,
+    # "--month", wind_month,
+    # "--day", wind_day,
+    # "--hour", wind_hour,
+    # "--minute", wind_minute,
+    # "--mesh_resolution", data['output_cell_size'], #Resolution of model calculations
+    # "--vegetation", "brush", #Vegetation type (can be 'grass', 'brush', or 'trees')
+    # "--time_zone", "America/Boise", #time zone of target simulation
+    # "--diurnal_winds", "true", #consider diurnal cycles in calculations
+    # "--write_goog_output", "false", #write kml output (boolean: true/false)
+    # "--write_shapefile_output", "false", #write shapefile output (boolean: true/false)
+    # "--write_farsite_atm", "false", #write fire behavior file (boolean: true/false)
+    # "--write_ascii_output", "true", #write ascii file output (this should always be set to true)
+    # "--ascii_out_resolution", "-1", #resolution of output (-1 means same as mesh_resolution)
+    # "--units_ascii_out_resolution", "m",
+    # "--units_mesh_resolution", "m", #units of resolution of model calculations (should be "m" for meters)
+    # "--units_output_wind_height", "m", #units of output wind height
+    # "--output_speed_units", "mps",
+    # "--output_wind_height", "3",
+    # "--wx_station_filename", csv_filename, #weather station csv file used in point initialization method
+    # "--output_path", data['scratch_ws']] #path to output
+
+    # Last line uncomment for upload
+    
     #run the WindNinja_cli.exe (output is written to the same location as elevatoin raster)
     arcpy.AddMessage('Calling WindNinja command line interface')
     runfile = subprocess.Popen(args, stdout = subprocess.PIPE, bufsize = -1)
