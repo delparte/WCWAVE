@@ -1,5 +1,5 @@
 import arcpy
-from arcpy.sa import *
+#from arcpy.sa import * #If anything is ever not defined see if it is part of arcpy.as
 import glob
 import os
 import sys
@@ -27,7 +27,7 @@ class SpatialLicenseError(Exception):
     pass
 
 class GeostatsLicenseError(Exception):
-    pass    
+    pass
     
 try:
     if arcpy.CheckExtension('Spatial') == "Available":
@@ -393,7 +393,7 @@ def DetrendedMethod(parameter, data_table, date_stamp, out_ras):
     #Air temp kriging model
     #k_model = KrigingModelOrdinary('LINEAR', 37.061494)
     radius = RadiusFixed(10000, 1)
-    outKrig = Kriging(in_point_features = data_table,
+    outKrig = arcpy.sa.Kriging(in_point_features = data_table,
             z_field = 'residual',
             kriging_model = k_model,
             cell_size = data['output_cell_size'],
@@ -510,7 +510,7 @@ def CombinedMethod(parameter, data_table, date_stamp, out_ras):
             quantile_value = '0.5',
             threshold_type = 'EXCEED',
             semivariogram_model_type='WHITTLE_DETRENDED')
-    out_extract = ExtractByMask(resid_raster, data['dem'])
+    out_extract = arcpy.sa.ExtractByMask(resid_raster, data['dem'])
     out_extract.save(scratch_raster)
 
     #Add back elevation trends and save final raster
@@ -605,15 +605,15 @@ def DewPoint(clim_tab, date_stamp):
     return raster
 
 def PercentSnow(dew_point, date_stamp):
-    inRas = Raster(dew_point)
+    inRas = arcpy.Raster(dew_point)
     outRas = '{0}/percent_snow_{1}.{2}'.format(data['out_folder'], date_stamp, data['file_format'])
     out_snow_ras = arcpy.sa.Con(inRas < -5.0, 1.0,
-                                    Con((inRas >= -5.0) & (inRas < -3.0), 1.0,
-                                       Con((inRas >= -3.0) & (inRas < -1.5), 1.0,
-                                           Con((inRas >= -1.5) & (inRas < -0.5), 1.0,
-                                               Con((inRas >= -0.5) & (inRas < 0.0), 0.75,
-                                                   Con((inRas >= 0.0) & (inRas < 0.5), 0.25,
-                                                       Con(inRas >= 0.5,0.0)))))))
+                                    arcpy.sa.Con((inRas >= -5.0) & (inRas < -3.0), 1.0,
+                                       arcpy.sa.Con((inRas >= -3.0) & (inRas < -1.5), 1.0,
+                                           arcpy.sa.Con((inRas >= -1.5) & (inRas < -0.5), 1.0,
+                                               arcpy.sa.Con((inRas >= -0.5) & (inRas < 0.0), 0.75,
+                                                   arcpy.sa.Con((inRas >= 0.0) & (inRas < 0.5), 0.25,
+                                                       arcpy.sa.Con(inRas >= 0.5,0.0)))))))
     if(data['file_format'] == 'ASC'):
         arcpy.conversion.RasterToASCII(out_snow_ras, outRas)
     else:
@@ -623,15 +623,15 @@ def PercentSnow(dew_point, date_stamp):
     return outRas
 
 def SnowDensity(dew_point, date_stamp):
-    inRas = Raster(dew_point)
+    inRas = arcpy.Raster(dew_point)
     outRas = '{0}/rho_snow_{1}.{2}'.format(data['out_folder'], date_stamp, data['file_format'])
     out_snow_density = arcpy.sa.Con(inRas < -5.0, 1.0,
-                                Con((inRas >= -5.0) & (inRas < -3.0), 1.0,
-                                   Con((inRas >= -3.0) & (inRas < -1.5), 1.0,
-                                       Con((inRas >= -1.5) & (inRas < -0.5), 1.0,
-                                           Con((inRas >= -0.5) & (inRas < 0.0), 0.75,
-                                               Con((inRas >= 0.0) & (inRas < 0.5), 0.25,
-                                                   Con(inRas >= 0.5,0.0)))))))
+                                arcpy.sa.Con((inRas >= -5.0) & (inRas < -3.0), 1.0,
+                                   arcpy.sa.Con((inRas >= -3.0) & (inRas < -1.5), 1.0,
+                                       arcpy.sa.Con((inRas >= -1.5) & (inRas < -0.5), 1.0,
+                                           arcpy.sa.Con((inRas >= -0.5) & (inRas < 0.0), 0.75,
+                                               arcpy.sa.Con((inRas >= 0.0) & (inRas < 0.5), 0.25,
+                                                   arcpy.sa.Con(inRas >= 0.5,0.0)))))))
 
     if(data['file_format'] == 'ASC'):
         arcpy.conversion.RasterToASCII(out_snow_density, outRas)
@@ -671,7 +671,7 @@ def SolarRadiation(clim_tab, date_stamp, date_time, time_step):
     sky_size = 200
 
     try:
-        out_global_radiation = AreaSolarRadiation(data['dem'], '', sky_size, in_twd)
+        out_global_radiation = arcpy.sa.AreaSolarRadiation(data['dem'], '', sky_size, in_twd)
         #out_global_radiation = out_global_radiation / data['time_step']
     except arcpy.ExecuteError:
         msgs = arcpy.GetMessages(2)
@@ -774,7 +774,7 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
 
     #Correct air temperature and vapor pressure rasters (Marks and Dozier (1979), pg. 164)
     #(4) corrected air temperature
-    T_prime = T_a + (0.0065 * Raster(z))
+    T_prime = T_a + (0.0065 * arcpy.Raster(z))
     #saturated vapor pressure from original air temperature (T_a)
     e_sa = arcpy.sa.Float(6.11 * 10**((7.5*arcpy.sa.Float(T_a))/(237.3 + arcpy.sa.Float(T_a))))
     #saturated vapor pressure from corrected air temperature (T_prime)
@@ -784,7 +784,7 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
 
     #Pressure at a given elevation (Marks and Dozier (1979), pg. 168-169)
     term1 = ((-g*m)/(R*gamma))
-    delta_z = Raster(z) - z_m
+    delta_z = arcpy.Raster(z) - z_m
     term2 = ((T_m + gamma * delta_z)) / T_m
     lnTerm = arcpy.sa.Ln(term2)
     expTerm = arcpy.sa.Exp(term1 * lnTerm)
@@ -796,7 +796,7 @@ def ThermalRadiation(clim_tab, date_stamp, in_air, in_vap, in_surface_temp):
     #Incoming longwave radiation (Marks and Dozier (1979), pg. 164)
     term3 = arcpy.sa.Float((epsilon_a * sigma * (T_a ** 4)) * vf)
     term4 = arcpy.sa.Float(epsilon_s * sigma * (T_s ** 4))
-    term5 = (1 - Raster(vf))
+    term5 = (1 - arcpy.Raster(vf))
     output_thermal_radiation = arcpy.sa.Float(term3 + (term4 * term5)) #(9)
     if(data['file_format'] == 'ASC'):
         arcpy.conversion.RasterToASCII(output_thermal_radiation, out_file)
@@ -828,7 +828,7 @@ def PrecipitationMass(precip_tab, date_stamp):
         if slope != 0.0 and intercept != 0.0:
             #Create final raster
             arcpy.env.extent = data['ext_elev']
-            raster = (Raster(data['dem']) * slope + intercept)
+            raster = (arcpy.Raster(data['dem']) * slope + intercept)
             if(data['file_format'] == 'ASC'):
                 arcpy.conversion.RasterToASCII(raster, out_raster_name)
             else:
@@ -887,7 +887,7 @@ def SnowCoverTemperature(date_stamp):
     avg_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], avg_param, date_stamp, data['file_format'])
 
     if len(data['ul_interp_values']['features']) <= 1:
-        upper_layer_temperature = -0.0008 * Raster(data['dem']) + 0.1053
+        upper_layer_temperature = -0.0008 * arcpy.Raster(data['dem']) + 0.1053
         if(data['file_format'] == 'ASC'):
             arcpy.conversion.RasterToASCII(upper_layer_temperature, ul_raster_name)
         else:
@@ -901,13 +901,13 @@ def SnowCoverTemperature(date_stamp):
         lr_results = stats.linregress(ls_elevation, ls_density)
         slope_ul = lr_results[0]
         intercept_ul = lr_results[1]
-        upper_layer_temperature = slope_ul * Raster(data['dem']) + intercept_ul
+        upper_layer_temperature = slope_ul * arcpy.Raster(data['dem']) + intercept_ul
         if(data['file_format'] == 'ASC'):
             arcpy.conversion.RasterToASCII(upper_layer_temperature, ul_raster_name)
         else:
             upper_layer_temperature.save(ul_raster_name)
     if len(data['ll_interp_values']['features']) <=1:
-        lower_layer_temperature = -0.0008 * Raster(data['dem']) + 1.3056
+        lower_layer_temperature = -0.0008 * arcpy.Raster(data['dem']) + 1.3056
     else:
         ls_elevation = []
         ls_temperature = []
@@ -918,7 +918,7 @@ def SnowCoverTemperature(date_stamp):
         lr_results = stats.linregress(ls_elevation, ls_temperature)
         slope_ll = lr_results[0]
         intercept_ll = lr_results[1]
-        lower_layer_temperature = slope_ll * Raster(data['dem']) + intercept_ll
+        lower_layer_temperature = slope_ll * arcpy.Raster(data['dem']) + intercept_ll
 
     #average snowcover temperature is the average of the upper and lower layer temperatures
     avg_sc_temp = arcpy.sa.CellStatistics([upper_layer_temperature, lower_layer_temperature], 'MEAN', 'NODATA')
@@ -933,7 +933,7 @@ def SnowDensityInterpolation(date_stamp):
     param = 'rho'
     out_raster_name = '{0}/{1}_{2}.{3}'.format(data['out_folder'], param, date_stamp, data['file_format'])
     if len(data['density_interp_values']['features']) <= 1:
-        snow_density_raster = -0.0395 * Raster(data['dem']) + 405.26
+        snow_density_raster = -0.0395 * arcpy.Raster(data['dem']) + 405.26
         if data['file_format'] == 'ASC':
             arcpy.conversion.RasterToASCII(snow_density_raster, out_raster_name)
         else:
@@ -948,7 +948,7 @@ def SnowDensityInterpolation(date_stamp):
         lr_results = stats.linregress(ls_elevation, ls_density)
         slope = lr_results[0]
         intercept = lr_results[1]
-        snow_density_raster = slope * Raster(data['dem']) + intercept
+        snow_density_raster = slope * arcpy.Raster(data['dem']) + intercept
         snow_density_raster.save(out_raster_name)
     return out_raster_name
 
