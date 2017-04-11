@@ -23,8 +23,29 @@ from email.MIMEMultipart import MIMEMultipart
 from email.MIMEText import MIMEText
 
 ##Checkout needed Extentions
-arcpy.CheckOutExtension('Spatial')
-arcpy.CheckOutExtension('GeoStats')
+class SpatialLicenseError(Exception):
+    pass
+
+class GeostatsLicenseError(Exception):
+    pass    
+    
+try:
+    if arcpy.CheckExtension('Spatial') == "Available":
+        arcpy.CheckOutExtension('Spatial')
+    else:
+        raise SpatialLicenseError
+except SpatialLicenseError:
+    arcpy.AddError("Spatial License is unavailable")
+    sys.exit(1) ## Terminate script
+    
+try:
+    if arcpy.CheckExtension('Geostats') == "Available":
+        arcpy.CheckOutExtension('Geostats')
+    else:
+        raise GeostatsLicenseError
+except GeostatsLicenseError:
+    arcpy.AddError("Geostats License is unavailable")
+    sys.exit(1) ## Terminate script
 
 data = {'sql_ph': '%s'}
 
@@ -1409,6 +1430,7 @@ if __name__ == '__main__':
         arcpy.AddMessage("Error")
         subject = "[VWCSIT] There was an error"
         message = arcpy.GetMessages(0)
+        arcpy.AddError(message)
         emailer(data['email_address'], subject, message)
     else:
         subject = "[VWCSIT] Processing Complete"
