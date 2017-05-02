@@ -27,13 +27,13 @@ The tool requires an elevation raster and a shapefile/featureclass of the statio
 - demo_data (dir) - Directory with sample data to test installations
 - joels_scripts (dir) - Origional scripts in separate files (used to create gridtools.py)
 - testing (dir) - directory used for testing scripts
-- utilites (dir) - ftp_2_sqlite.py script - used with ArcMap Toolbox
+- utilites (dir) - ftp_2_sqlite.py script - used with Gridding Tools Toolbox
 - Cross_Validation.tbx - Cross validation toolbox for use in ArcMap
 - Gridding_Tools.tbx - Gridding Tools toolbox. Includes gridding tool and ftp2sqlite tool
 - cross_validation.py - script called from Cross Validation toolbox
 - gridtools.py - Gridding Tools script
 - gridtoolwrap.py - No longer supported. Used to create command line capable tool
-- runGriddingToolsJD.py - No longer supported. Gridding Tools on JD
+- runGriddingToolsJD.py - No longer supported. Gridding Tools on Johnston Draw (use gridtools.py now)
 
 ## Naming convention
 
