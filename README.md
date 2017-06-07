@@ -19,7 +19,60 @@ The tool requires an elevation raster and a shapefile/featureclass of the statio
 
 ### Server Installation
 
-*Check Back Later*
+**Publish CSIT to geoprocessing server**
+
+This guide assumes you have a working ArcGIS server instance and you have Publisher privileges (ArcGIS 10.4+ restricts publisher privileges to Administrator Accounts only.  Instructions to give publishers those privileges can be found [on the Esri resources website](http://server.arcgis.com/en/server/latest/administer/windows/change-geoprocessing-service-and-service-extension-publishing-privileges.htm)).
+
+Geoprocessing services cannot have external executables in them (ie. WindNinja)  There is currently a workaround where these executables can be commented out and then uncommented after they are published.
+
+Comment out `ninja_path` variable (~line 988) and the `args` array (Between comments ~line 1022-1046)
+
+The service needs to be run successfully before it can be uploaded. Run the tool with minimal settings (Watershed: Reynolds Creek; From Date: 2008-01-01 12:00:00; To Date: 2008-01-01 13:00:00 Air Temperature: True).  After the tool has completed successfully open up the Results pane (ArcMap Menu: Geoprocessing > Results).  Under the "Current Session" dropdown right click on the "Climate Data Gridding Tools" and click "Share As > Geoprocessing Service"
+
+Choose "Publish a service" (or "Overwrite an existing service").
+
+[Screenshot]
+
+Click the button to create a new connection, or select the connection you want to use.
+
+_Create a new connection_ 
+
+- Choose "Publish GIS services"
+- Fill in the Server URL and Authentication information and click Finish
+- On the Publish a Service Dialogue choose the new connection 
+
+Change the Service Name and click next.
+
+[Screenshot - obscure ip address]
+
+Choose the folder to Publish the service to (Create a new one or use an existing one) and click "Continue".
+
+_Service Editor Dialogue_
+
+General - Check the information is correct on the general tab. 
+
+[Screenshot - obscure ip]
+
+Capabilities - Leave parameters as default.
+
+Parameters - Change Message Level to "Info" (CSIT uses `arcpy.AddMessage()` to relay script data)
+
+Pooling - Adjust Timeouts to your needs.
+
+Processes - Leave as default.
+
+Climate Data Gridding Tools - Adjust Descriptions as needed.
+
+Item Description - Summary, Tags, and Descriptions are not added by default but are required.  Add whatever is not present.
+
+Sharing - Change as need.
+
+_Publishing the Service_
+
+Double check everything using the "Analyze" Button.  Fix any errors. (A few warnings will show, Code 24046 warning can be ignored; 24032 is a warning that data needs to be uploaded and that can also be ignored.)
+
+When all warnings and errors are resolved Click Publish. (If it fails to publish check the results window to see any errors or problems).
+
 
 ### Description of Files
 

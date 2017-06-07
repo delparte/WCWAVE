@@ -84,9 +84,9 @@ def main():
 def insertData(table, path_dir):
     ls_files = os.listdir(path_dir)
 
-    for file in ls_files:
-        if file[-4:] == ".dat":
-            file_location = '{0}/{1}'.format(path_dir,file)
+    for lf in ls_files:
+        if lf[-4:] == ".dat":
+            file_location = '{0}/{1}'.format(path_dir,lf)
             with open(file_location, 'rb') as f:
                 ls_header = []
                 for line in f:
